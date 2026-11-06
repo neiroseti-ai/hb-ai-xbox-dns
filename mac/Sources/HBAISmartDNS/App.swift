@@ -1,4 +1,4 @@
-// HB AI · Smart DNS 1.22 для macOS — те же сервисы, та же проверка и то же уведомление о новой версии, что в версии для Windows.
+// HB AI · Smart DNS 1.23 для macOS — те же сервисы, та же проверка и то же уведомление о новой версии, что в версии для Windows.
 import SwiftUI
 import CoreText
 

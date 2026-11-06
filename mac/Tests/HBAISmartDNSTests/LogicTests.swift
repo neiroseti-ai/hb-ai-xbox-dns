@@ -8,7 +8,10 @@ final class LogicTests: XCTestCase {
     // ---------- адреса ----------
 
     func testServiceAddresses() {
-        XCTAssertEqual(Services.setOf("109.120.132.43"), 2)
+        XCTAssertEqual(Services.setOf("109.120.177.170"), 2)
+        XCTAssertEqual(Services.setOf("45.88.163.92"), 2)
+        XCTAssertEqual(Services.setOf("5.175.161.40"), 1)
+        XCTAssertNil(Services.setOf("109.120.132.43"), "старый MagicDNS не выдаётся за сервис")
         XCTAssertEqual(Services.setOf("94.250.253.55"), 0)
         XCTAssertEqual(Services.setOf("212.109.195.93"), 0)
         XCTAssertEqual(Services.setOf("83.220.169.155"), 0, "прежний адрес Comss узнаётся")
@@ -21,7 +24,10 @@ final class LogicTests: XCTestCase {
     func testStaleAddresses() {
         XCTAssertTrue(Services.isStale("135.106.217.200"))
         XCTAssertTrue(Services.isStale("193.233.112.67"))
-        XCTAssertFalse(Services.isStale("109.120.132.43"))
+        XCTAssertTrue(Services.isStale("109.120.132.43"))
+        XCTAssertTrue(Services.isStale("94.249.177.102"))
+        XCTAssertTrue(Services.isStale("45.13.237.213"))
+        XCTAssertFalse(Services.isStale("109.120.177.170"))
         XCTAssertFalse(Services.isStale("192.168.1.1"))
     }
 
@@ -108,13 +114,13 @@ final class LogicTests: XCTestCase {
 
     func testPlanWithoutIpv6() {
         let p = Dns.plan(set: 2, services: [wifi4], off: [])
-        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 109.120.132.43 94.249.177.102"] + flush)
+        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 109.120.177.170 45.88.163.92"] + flush)
         XCTAssertEqual(p.off, [])
     }
 
     func testPlanTurnsIpv6OffAndRemembers() {
         let p = Dns.plan(set: 2, services: [wifi6], off: [])
-        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 109.120.132.43 94.249.177.102", "\(ns) -setv6off \"Wi-Fi\""] + flush)
+        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 109.120.177.170 45.88.163.92", "\(ns) -setv6off \"Wi-Fi\""] + flush)
         XCTAssertEqual(p.off, ["Wi-Fi"])
     }
 

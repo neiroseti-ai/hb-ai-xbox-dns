@@ -6,7 +6,7 @@ python tools/probe_dns.py — таблица по всем кандидатам 
 import socket, struct, subprocess, sys
 
 CANDIDATES = [
-    ("Comss.one", "83.220.169.155"), ("Comss.one-2", "212.109.195.93"), ("Comss резерв", "195.133.25.16"),
+    ("Comss.one", "94.250.253.55"), ("Comss старый", "83.220.169.155"), ("Comss.one-2", "212.109.195.93"), ("Comss резерв", "195.133.25.16"),
     ("GeoHide-EU", "143.20.64.192"), ("GeoHide-EU-2", "45.13.237.213"), ("GeoHide-EU-3", "5.175.161.40"),
     ("MagicDNS", "109.120.132.43"), ("MagicDNS-2", "94.249.177.102"), ("Astracat", "135.106.217.200"),
     ("GeoHide RU", "159.194.200.33"), ("GeoHide RU-2", "193.233.112.67"),

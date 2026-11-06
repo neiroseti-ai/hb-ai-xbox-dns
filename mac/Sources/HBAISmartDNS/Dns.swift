@@ -1,21 +1,21 @@
 import Foundation
 
-// Сервисы Smart DNS. Список тот же, что в XboxDns.cs (проверено 27.10.2026 из России): Comss.one и MagicDNS
-// открывают ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity; GeoHide Европа — всё, Gemini через раз (капча Google).
-// Astracat убран в 1.22: его DNS не отвечает.
+// Сервисы Smart DNS. Список тот же, что в XboxDns.cs (проверено 06.11.2026 из России): Comss.one открывает всё;
+// GeoHide Европа — всё, кроме Gemini (капча), ElevenLabs через раз; MagicDNS переехал 04.11.2026 на новые адреса,
+// Claude и Gemini через него пока не открываются. Astracat убран в 1.22, старые MagicDNS и 45.13.237.213 — в 1.23.
 enum Services {
     static let name = ["Comss.one", "GeoHide EU", "MagicDNS", "Xbox DNS"]
     static let short = ["Comss", "GeoHide", "MagicDNS", "Xbox"]
     static let v4: [[String]] = [
         ["94.250.253.55", "212.109.195.93"],
-        ["143.20.64.192", "45.13.237.213"],
-        ["109.120.132.43", "94.249.177.102"],
+        ["143.20.64.192", "5.175.161.40"],
+        ["109.120.177.170", "45.88.163.92"],
         ["111.88.96.54", "111.88.96.55"],
     ]
     static let opens = [
         "ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity",
-        "ChatGPT, Claude, ElevenLabs, Grok, Perplexity; Gemini — через раз",
-        "ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity",
+        "ChatGPT, Claude, Grok, Perplexity; ElevenLabs — через раз, Gemini — капча",
+        "ChatGPT, ElevenLabs, Grok, Perplexity; Claude и Gemini — пока нет",
         "только Xbox Live, нейросети — нет",
     ]
     static let site = ["comss.ru", "geohide.ru", "magicdns.ru", "xbox-dns.ru"]
@@ -25,7 +25,8 @@ enum Services {
     // адреса из прежних версий, которые ещё работают: xbox-dns.ru 1.0 и прежний основной адрес Comss (до 1.22)
     static let oldSets: [String: Int] = ["111.88.96.50": 3, "111.88.96.51": 3, "83.220.169.155": 0]
     // нерабочие адреса прежних версий: российский узел GeoHide (1.1) и Astracat (1.2–1.21) — их не выдаём за сервис
-    static let stale: Set<String> = ["159.194.200.33", "193.233.112.67", "135.106.217.200", "85.209.2.112"]
+    static let stale: Set<String> = ["159.194.200.33", "193.233.112.67", "135.106.217.200", "85.209.2.112",
+                                     "109.120.132.43", "94.249.177.102", "45.13.237.213"]   // + MagicDNS до 04.11.2026 и второй GeoHide из 1.22
 
     /// Какому сервису принадлежит адрес DNS; nil — чужой адрес.
     static func setOf(_ address: String) -> Int? {
@@ -184,7 +185,7 @@ enum Dns {
 // Новая версия: GitHub отвечает на /releases/latest переадресацией на /releases/tag/vX.YY — из неё берём номер.
 // Без API и без ключей, один запрос при запуске; не получилось — молчим.
 final class Updates: NSObject, URLSessionTaskDelegate {
-    static let version = "1.22"
+    static let version = "1.23"
     static let page = "https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest"
 
     /// Номер версии из адреса переадресации; nil — адрес не про релиз.

@@ -1,4 +1,4 @@
-// HB AI · Smart DNS 1.22 — переключатель Smart DNS (Comss.one, GeoHide EU, MagicDNS, xbox-dns.ru) со встроенной проверкой и уведомлением о новой версии.
+// HB AI · Smart DNS 1.23 — переключатель Smart DNS (Comss.one, GeoHide EU, MagicDNS, xbox-dns.ru) со встроенной проверкой и уведомлением о новой версии.
 // Сборка: build.bat (csc из .NET Framework 4, есть в каждой Windows 10/11). DNS и IPv6 меняются через CIM, без PowerShell.
 using System;
 using System.Diagnostics;
@@ -19,7 +19,12 @@ namespace HbAi.XboxDns
 {
     static class Dns
     {
-        // Сервисы Smart DNS. Проверено 27.10.2026 из России (МГТС, Москва) кодом кнопки «Проверить»:
+        // Сервисы Smart DNS. Проверено 06.11.2026 из России (МГТС, Москва), tools/probe_dns.py и tools/claude_exit.py:
+        // Comss.one открывает всё (Claude видит Казахстан, Алматы); GeoHide Европа — всё, кроме Gemini (капча),
+        // ElevenLabs через раз, второй адрес 45.13.237.213 замолчал и заменён на 5.175.161.40 (Claude видит Нидерланды
+        // или Германию); MagicDNS 04.11.2026 переехал на 109.120.177.170 и 45.88.163.92, Claude и Gemini через него
+        // сейчас не открываются (узел 45.86.65.181 недоступен), старые адреса молчат.
+        // Проверка 27.10.2026 кодом кнопки «Проверить»:
         // Comss.one и MagicDNS открывают ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity; GeoHide Европа — всё,
         // кроме Gemini (капча Google). Astracat (135.106.217.200, 85.209.2.112) не отвечает — убран в 1.22.
         // Российские узлы GeoHide (159.194.200.33, 193.233.112.x) отвечают, но их прокси из России не открываются.
@@ -28,16 +33,16 @@ namespace HbAi.XboxDns
         public static readonly string[] Short = { "Comss", "GeoHide", "MagicDNS", "Xbox" };
         public static readonly string[][] V4 = {
             new[] { "94.250.253.55", "212.109.195.93" },
-            new[] { "143.20.64.192", "45.13.237.213" },
-            new[] { "109.120.132.43", "94.249.177.102" },
+            new[] { "143.20.64.192", "5.175.161.40" },
+            new[] { "109.120.177.170", "45.88.163.92" },
             new[] { "111.88.96.54", "111.88.96.55" } };
         public static readonly string[][] V6 = {
             new string[0], new string[0], new string[0],
             new[] { "2a00:ab00:1233:26::50", "2a00:ab00:1233:26::51" } };
         public static readonly string[] Opens = {
             "ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity",
-            "ChatGPT, Claude, ElevenLabs, Grok, Perplexity; Gemini — через раз",
-            "ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity",
+            "ChatGPT, Claude, Grok, Perplexity; ElevenLabs — через раз, Gemini — капча",
+            "ChatGPT, ElevenLabs, Grok, Perplexity; Claude и Gemini — пока нет",
             "только Xbox Live, нейросети — нет" };
         public static readonly string[] Site = { "comss.ru", "geohide.ru", "magicdns.ru", "xbox-dns.ru" };
         public static readonly string[] Url = { "https://www.comss.ru/", "https://geohide.ru/", "https://magicdns.ru/", "https://xbox-dns.ru/" };
@@ -48,7 +53,8 @@ namespace HbAi.XboxDns
         // программа не выдаёт их за рабочий сервис, а предлагает нажать кнопку и поставить рабочие адреса.
         static readonly string[] XboxOld = { "111.88.96.50", "111.88.96.51" };
         static readonly string[] ComssOld = { "83.220.169.155" };   // до 1.22; 27.10.2026 ещё работает, но с официальной страницы Comss убран
-        static readonly string[] Stale = { "159.194.200.33", "193.233.112.67", "135.106.217.200", "85.209.2.112" };
+        static readonly string[] Stale = { "159.194.200.33", "193.233.112.67", "135.106.217.200", "85.209.2.112",
+            "109.120.132.43", "94.249.177.102", "45.13.237.213" };   // + MagicDNS до 04.11.2026 и второй GeoHide из 1.22 — молчат с 06.11.2026
 
         // -1 — DNS сервиса не стоит, иначе номер набора (IPv4 определяет набор)
         public static int ActiveSet()
@@ -442,7 +448,7 @@ namespace HbAi.XboxDns
 
     class MainForm : Form
     {
-        internal const string Version = "1.22";   // та же версия в app.manifest (1.2.2.0) и в первой строке файла
+        internal const string Version = "1.23";   // та же версия в app.manifest (1.2.3.0) и в первой строке файла
         static readonly Color Bg = Color.FromArgb(7, 7, 11);
         static readonly Color Violet = Color.FromArgb(140, 112, 255);
         static readonly Color Yellow = Color.FromArgb(255, 224, 102);
