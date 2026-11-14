@@ -1,4 +1,4 @@
-// HB AI · Smart DNS 1.23 — переключатель Smart DNS (Comss.one, GeoHide EU, MagicDNS, xbox-dns.ru) со встроенной проверкой и уведомлением о новой версии.
+// HB AI · Smart DNS 1.24 — переключатель Smart DNS (GeoHide EU, MagicDNS, xbox-dns.ru) со встроенной проверкой и уведомлением о новой версии.
 // Сборка: build.bat (csc из .NET Framework 4, есть в каждой Windows 10/11). DNS и IPv6 меняются через CIM, без PowerShell.
 using System;
 using System.Diagnostics;
@@ -19,42 +19,42 @@ namespace HbAi.XboxDns
 {
     static class Dns
     {
-        // Сервисы Smart DNS. Проверено 06.11.2026 из России (МГТС, Москва), tools/probe_dns.py и tools/claude_exit.py:
-        // Comss.one открывает всё (Claude видит Казахстан, Алматы); GeoHide Европа — всё, кроме Gemini (капча),
-        // ElevenLabs через раз, второй адрес 45.13.237.213 замолчал и заменён на 5.175.161.40 (Claude видит Нидерланды
-        // или Германию); MagicDNS 04.11.2026 переехал на 109.120.177.170 и 45.88.163.92, Claude и Gemini через него
-        // сейчас не открываются (узел 45.86.65.181 недоступен), старые адреса молчат.
-        // Проверка 27.10.2026 кодом кнопки «Проверить»:
-        // Comss.one и MagicDNS открывают ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity; GeoHide Европа — всё,
-        // кроме Gemini (капча Google). Astracat (135.106.217.200, 85.209.2.112) не отвечает — убран в 1.22.
+        // Сервисы Smart DNS. Проверено 14.11.2026 из России (МГТС, Москва), tools/probe_dns.py:
+        // GeoHide Европа открывает ChatGPT, Claude, ElevenLabs и Grok, но на каждый сайт отдаёт семь адресов своих
+        // узлов, и три из них не отвечали совсем (143.20.64.192, 37.221.93.128, 45.13.237.213), а четвёртый
+        // (31.25.239.132) — для части сайтов; Gemini — капча,
+        // Perplexity пропускает напрямую. MagicDNS (с 04.11.2026 на 109.120.177.170 и 45.88.163.92)
+        // 14.11.2026 не отвечал; 06.11.2026 открывал ChatGPT, ElevenLabs, Grok.
+        // Comss.one убран в 1.24: к 14.11.2026 он стал отдавать настоящие адреса нейросетей, без подмены — на его
+        // странице «ИИ-сервисы (ChatGPT, Claude, Gemini) через Comss.one DNS больше не работают», Claude видит Россию.
+        // Astracat (135.106.217.200, 85.209.2.112) не отвечает — убран в 1.22.
         // Российские узлы GeoHide (159.194.200.33, 193.233.112.x) отвечают, но их прокси из России не открываются.
         // xbox-dns.ru с 10.10.2026 на нейросети отвечает 0.0.0.0, оставлен только для Xbox Live.
-        public static readonly string[] Name = { "Comss.one", "GeoHide EU", "MagicDNS", "Xbox DNS" };
-        public static readonly string[] Short = { "Comss", "GeoHide", "MagicDNS", "Xbox" };
+        public static readonly string[] Name = { "GeoHide EU", "MagicDNS", "Xbox DNS" };
+        public static readonly string[] Short = { "GeoHide", "MagicDNS", "Xbox" };
         public static readonly string[][] V4 = {
-            new[] { "94.250.253.55", "212.109.195.93" },
             new[] { "143.20.64.192", "5.175.161.40" },
             new[] { "109.120.177.170", "45.88.163.92" },
             new[] { "111.88.96.54", "111.88.96.55" } };
         public static readonly string[][] V6 = {
-            new string[0], new string[0], new string[0],
+            new string[0], new string[0],
             new[] { "2a00:ab00:1233:26::50", "2a00:ab00:1233:26::51" } };
+        // Что сервис открывает, меняется за дни, поэтому подпись отсылает к кнопке «Проверить».
         public static readonly string[] Opens = {
-            "ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity",
-            "ChatGPT, Claude, Grok, Perplexity; ElevenLabs — через раз, Gemini — капча",
-            "ChatGPT, ElevenLabs, Grok, Perplexity; Claude и Gemini — пока нет",
+            "ChatGPT, Claude, ElevenLabs, Grok; Gemini — капча. Точнее — «Проверить»",
+            "ChatGPT, ElevenLabs, Grok — когда отвечает. Сначала «Проверить»",
             "только Xbox Live, нейросети — нет" };
-        public static readonly string[] Site = { "comss.ru", "geohide.ru", "magicdns.ru", "xbox-dns.ru" };
-        public static readonly string[] Url = { "https://www.comss.ru/", "https://geohide.ru/", "https://magicdns.ru/", "https://xbox-dns.ru/" };
+        public static readonly string[] Site = { "geohide.ru", "magicdns.ru", "xbox-dns.ru" };
+        public static readonly string[] Url = { "https://geohide.ru/", "https://magicdns.ru/", "https://xbox-dns.ru/" };
         public static int Count { get { return Name.Length; } }
-        public const int XboxSet = 3;
+        public const int XboxSet = 2;
         // Адреса из прежних версий. Старый xbox-dns.ru (1.0) — тот же сервис для Xbox.
-        // Российский узел GeoHide (1.1) и Astracat (1.2–1.21) из России нейросети не открывают: если они стоят,
-        // программа не выдаёт их за рабочий сервис, а предлагает нажать кнопку и поставить рабочие адреса.
+        // Российский узел GeoHide (1.1), Astracat (1.2–1.21) и Comss.one (1.1–1.23) из России нейросети не открывают:
+        // если они стоят, программа не выдаёт их за рабочий сервис, а предлагает нажать кнопку и поставить рабочие адреса.
         static readonly string[] XboxOld = { "111.88.96.50", "111.88.96.51" };
-        static readonly string[] ComssOld = { "83.220.169.155" };   // до 1.22; 27.10.2026 ещё работает, но с официальной страницы Comss убран
         static readonly string[] Stale = { "159.194.200.33", "193.233.112.67", "135.106.217.200", "85.209.2.112",
-            "109.120.132.43", "94.249.177.102", "45.13.237.213" };   // + MagicDNS до 04.11.2026 и второй GeoHide из 1.22 — молчат с 06.11.2026
+            "109.120.132.43", "94.249.177.102", "45.13.237.213",    // MagicDNS до 04.11.2026 и второй GeoHide из 1.22 — молчат с 06.11.2026
+            "94.250.253.55", "212.109.195.93", "83.220.169.155" };   // Comss.one: с 14.11.2026 адреса нейросетей не подменяет
 
         // -1 — DNS сервиса не стоит, иначе номер набора (IPv4 определяет набор)
         public static int ActiveSet()
@@ -78,7 +78,6 @@ namespace HbAi.XboxDns
             string s = address.Split('%')[0].ToLowerInvariant();
             for (int k = 0; k < V4.Length; k++) if (V4[k].Contains(s) || V6[k].Contains(s)) return k;
             if (XboxOld.Contains(s)) return XboxSet;
-            if (ComssOld.Contains(s)) return 0;
             return -1;
         }
 
@@ -283,13 +282,29 @@ namespace HbAi.XboxDns
 
     // Проверка: спрашиваем DNS сервиса напрямую (UDP, порт 53), подключаемся к выданному адресу по TLS с именем
     // сайта и смотрим ответ. Так видно, что получит человек, даже если DNS ещё не включён.
+    // Адрес от сервиса сверяем с тем, что отвечают обычные DNS (Control). Совпал — сервис этот сайт не подменяет,
+    // и человек попадает на него напрямую, как без программы. Так было с Comss.one в ноябре 2026: адреса настоящие,
+    // ChatGPT отвечал 403 без слов о стране, и версия 1.23 писала «открывается».
     static class Probe
     {
         public static readonly string[] Host = { "chatgpt.com", "claude.ai", "gemini.google.com", "elevenlabs.io", "grok.com", "www.perplexity.ai" };
         public static readonly string[] Label = { "ChatGPT", "Claude", "Gemini", "ElevenLabs", "Grok", "Perplexity" };
-        public const string Ok = "открывается", Blocked = "блок страны", Captcha = "капча Google", NoLink = "нет связи", NoDns = "DNS молчит", Zero = "не пускает";
+        public const string Ok = "открывается", Blocked = "блок страны", Captcha = "капча Google", NoLink = "нет связи", NoDns = "DNS молчит", Zero = "не пускает", Direct = "напрямую";
 
+        // Обычные DNS для сверки. Яндекс и Google отвечают как для России, Quad9 — как для заграницы: у Cloudflare
+        // для России свои адреса, и 14.11.2026 GeoHide отдавал для Perplexity настоящие, но «заграничные».
+        internal static string[] Control = { "77.88.8.8", "8.8.8.8", "9.9.9.9" };
+
+        // Первый адрес IPv4, который отдал сервер. "" — сервер ответил, но адреса нет; null — не ответил.
         public static string Resolve(string server, string host)
+        {
+            var all = ResolveAll(server, host);
+            return all == null ? null : all.Length == 0 ? "" : all[0];
+        }
+
+        // Все адреса IPv4 из ответа сервера, по порядку. Пусто — адреса нет (NXDOMAIN или пустой ответ);
+        // null — сервер не ответил, отказал или ответ не наш (тогда пробуем второй адрес сервиса).
+        public static string[] ResolveAll(string server, string host)
         {
             var q = new MemoryStream();
             var w = new BinaryWriter(q);
@@ -297,7 +312,7 @@ namespace HbAi.XboxDns
             foreach (var part in host.Split('.')) { w.Write((byte)part.Length); w.Write(Encoding.ASCII.GetBytes(part)); }
             w.Write(new byte[] { 0, 0, 1, 0, 1 });
             // UDP-пакет иногда теряется (проверка 27.10.2026: GeoHide раз в несколько запросов не отвечал),
-            // поэтому спрашиваем до двух раз, прежде чем писать «DNS молчит».
+            // поэтому спрашиваем до двух раз, прежде чем считать, что сервер молчит.
             var data = q.ToArray();
             for (int attempt = 0; attempt < 2; attempt++)
             {
@@ -308,8 +323,8 @@ namespace HbAi.XboxDns
                         u.Client.ReceiveTimeout = 2500;
                         var ep = new System.Net.IPEndPoint(System.Net.IPAddress.Parse(server), 53);
                         u.Send(data, data.Length, ep);
-                        string ip = ParseA(u.Receive(ref ep));
-                        if (ip != null) return ip;
+                        string[] ips = ParseAll(u.Receive(ref ep));
+                        if (ips != null) return ips;
                     }
                 }
                 catch (System.Net.Sockets.SocketException) { }
@@ -319,19 +334,19 @@ namespace HbAi.XboxDns
 
         const int QueryId = 0x2a2a;
 
-        // Первый адрес IPv4 из ответа DNS. "" — сервер ответил, но адреса нет (NXDOMAIN или пустой ответ);
-        // null — ответ не наш, битый или сервер отказал (тогда пробуем второй адрес сервиса).
-        internal static string ParseA(byte[] r)
+        // Адреса IPv4 из ответа DNS. Пусто — сервер ответил, но адреса нет (NXDOMAIN или пустой ответ);
+        // null — ответ не наш, битый или сервер отказал.
+        internal static string[] ParseAll(byte[] r)
         {
             try
             {
                 if (!OurAnswer(r)) return null;
                 int rcode = r[3] & 0x0F;
-                if (rcode == 3) return "";        // такого имени нет
-                if (rcode != 0) return null;      // сервер отказал
+                if (rcode == 3) return new string[0];   // такого имени нет
+                if (rcode != 0) return null;            // сервер отказал
                 int i = 12;
                 for (int n = 0; n < (r[4] << 8 | r[5]); n++) i = SkipName(r, i) + 4;
-                return FirstA(r, i, r[6] << 8 | r[7]);
+                return AllA(r, i, r[6] << 8 | r[7]);
             }
             catch (IndexOutOfRangeException) { return null; }
             catch (FormatException) { return null; }
@@ -340,20 +355,66 @@ namespace HbAi.XboxDns
         // ответ на наш запрос: длина заголовка, номер запроса, флаг «это ответ»
         static bool OurAnswer(byte[] r) { return r.Length >= 12 && (r[0] << 8 | r[1]) == QueryId && (r[2] & 0x80) != 0; }
 
-        // первый адрес IPv4 среди записей ответа, начиная с i; null — запись длиннее пакета (ответ обрезан)
-        static string FirstA(byte[] r, int i, int answers)
+        // адреса IPv4 среди записей ответа, начиная с i
+        static string[] AllA(byte[] r, int i, int answers)
         {
-            for (int n = 0; n < answers; n++)
+            var found = new System.Collections.Generic.List<string>();
+            try
             {
-                i = SkipName(r, i);
-                int type = r[i] << 8 | r[i + 1], cls = r[i + 2] << 8 | r[i + 3], len = r[i + 8] << 8 | r[i + 9];
-                i += 10;
-                if (type == 1 && cls == 1 && len == 4) return r[i] + "." + r[i + 1] + "." + r[i + 2] + "." + r[i + 3];
-                i += len;
-                if (i > r.Length) return null;
+                for (int n = 0; n < answers; n++)
+                {
+                    i = SkipName(r, i);
+                    int type = r[i] << 8 | r[i + 1], cls = r[i + 2] << 8 | r[i + 3], len = r[i + 8] << 8 | r[i + 9];
+                    i += 10;
+                    if (i + len > r.Length) return Cut(found);   // запись длиннее пакета
+                    if (type == 1 && cls == 1 && len == 4) found.Add(r[i] + "." + r[i + 1] + "." + r[i + 2] + "." + r[i + 3]);
+                    i += len;
+                }
+                return found.ToArray();
             }
-            return "";
+            catch (IndexOutOfRangeException) { return Cut(found); }
+            catch (FormatException) { return Cut(found); }
         }
+
+        // ответ оборвался: отдаём адреса, которые успели прочитать; ни одного — null, как будто сервер не ответил
+        static string[] Cut(System.Collections.Generic.List<string> found) { return found.Count > 0 ? found.ToArray() : null; }
+
+        // Настоящие адреса сайта: всё, что ответили обычные DNS. Пусто — ни один не ответил, сверять не с чем.
+        // Каждого спрашиваем до двух раз, как и сервис: «заграничные» адреса даёт один Quad9, и потерянный
+        // пакет от него два других не закроют.
+        public static System.Collections.Generic.HashSet<string> Real(string host)
+        {
+            var real = new System.Collections.Generic.HashSet<string>();
+            var th = Control.Select(srv => new Thread(() =>
+            {
+                var ips = ResolveAll(srv, host);
+                if (ips != null) lock (real) foreach (var ip in ips) real.Add(ip);
+            }) { IsBackground = true }).ToArray();
+            foreach (var x in th) x.Start();
+            foreach (var x in th) x.Join();
+            return real;
+        }
+
+        // Итог по сайту: site — что ответил сайт по адресу ip от сервиса, real — настоящие адреса сайта.
+        // Адрес от сервиса настоящий — человек идёт на сайт напрямую, как без программы, и «открывается» тут
+        // ничего не значит (ChatGPT из России отвечает 403 без слов о стране): пишем «напрямую».
+        // Отказ по стране, капчу и обрыв связи сайт назвал сам — их оставляем как есть.
+        public static string Through(string site, string ip, System.Collections.Generic.ICollection<string> real)
+        {
+            return site == Ok && IsReal(ip, real) ? Direct : site;
+        }
+
+        // Настоящий ли адрес: совпал с ответом обычного DNS или лежит с ним в одной сети /24. У крупных сайтов
+        // адреса идут пачкой: 14.11.2026 обычные DNS называли для Perplexity 8.47.69.0, а российский узел
+        // GeoHide — 8.47.69.5, и точное сравнение такой адрес не узнавало.
+        public static bool IsReal(string ip, System.Collections.Generic.ICollection<string> real)
+        {
+            string net = Net24(ip);
+            return real.Any(r => Net24(r) == net);
+        }
+
+        // первые три числа адреса IPv4
+        internal static string Net24(string ip) { int dot = ip.LastIndexOf('.'); return dot < 0 ? ip : ip.Substring(0, dot); }
 
         // Имя в DNS — метки, которые кончаются нулём или ссылкой (два байта 11xxxxxx) на имя выше в пакете.
         // Ссылка может стоять и после нескольких меток (например, «www» + ссылка на «example.com»).
@@ -415,9 +476,9 @@ namespace HbAi.XboxDns
                 int k = i;
                 th[k] = new Thread(() =>
                 {
-                    string ip = null;
-                    foreach (var srv in Dns.V4[set]) { ip = Resolve(srv, Host[k]); if (ip != null) break; }
-                    res[k] = Verdict(ip) ?? Site(Host[k], ip);
+                    string[] ips = null;
+                    foreach (var srv in Dns.V4[set]) { ips = ResolveAll(srv, Host[k]); if (ips != null) break; }
+                    res[k] = Judge(Host[k], ips, Real, Site);
                 });
                 th[k].IsBackground = true; th[k].Start();
             }
@@ -425,7 +486,37 @@ namespace HbAi.XboxDns
             return res;
         }
 
-        // что сказать по ответу DNS, не заходя на сайт; null — адрес настоящий, надо проверять сайт
+        // Сервис отдаёт сразу несколько адресов своих узлов, в случайном порядке, и часть узлов бывает мёртвой:
+        // 14.11.2026 у GeoHide не отвечали три-четыре из семи, и проверка по одному первому адресу через раз писала
+        // «нет связи», хотя через соседний узел сайт открывался. Браузер в таком случае идёт к следующему адресу,
+        // поэтому смотрим первые Tries адресов разом и берём ответ первого по порядку, с которым есть связь.
+        internal const int Tries = 4;
+
+        // Итог по сайту из ответа DNS сервиса: ips — адреса от сервиса (null — сервис не ответил), real — где взять
+        // настоящие адреса сайта, ask — как спросить сайт по адресу. В программе это Real и Site, в тестах — подставные.
+        internal static string Judge(string host, string[] ips, Func<string, System.Collections.Generic.ICollection<string>> real, Func<string, string, string> ask)
+        {
+            return Verdict(ips == null ? null : ips.Length == 0 ? "" : ips[0]) ?? Reach(host, ips, real(host), ask);
+        }
+
+        internal static string Reach(string host, string[] ips, System.Collections.Generic.ICollection<string> real, Func<string, string, string> ask)
+        {
+            var take = ips.Take(Tries).ToArray();
+            var site = new string[take.Length];
+            var th = take.Select((ip, n) => new Thread(() => site[n] = ask(host, ip)) { IsBackground = true }).ToArray();
+            foreach (var x in th) x.Start();
+            foreach (var x in th) x.Join();
+            return Pick(take, site, real);
+        }
+
+        // ответ первого по порядку адреса, с которым есть связь; связи нет ни с одним — «нет связи»
+        public static string Pick(string[] ips, string[] site, System.Collections.Generic.ICollection<string> real)
+        {
+            for (int n = 0; n < ips.Length; n++) if (site[n] != NoLink) return Through(site[n], ips[n], real);
+            return NoLink;
+        }
+
+        // что сказать по ответу DNS, не заходя на сайт; null — адрес есть, надо проверять сайт
         public static string Verdict(string ip)
         {
             if (ip == null) return NoDns;
@@ -448,7 +539,7 @@ namespace HbAi.XboxDns
 
     class MainForm : Form
     {
-        internal const string Version = "1.23";   // та же версия в app.manifest (1.2.3.0) и в первой строке файла
+        internal const string Version = "1.24";   // та же версия в app.manifest (1.2.4.0) и в первой строке файла
         static readonly Color Bg = Color.FromArgb(7, 7, 11);
         static readonly Color Violet = Color.FromArgb(140, 112, 255);
         static readonly Color Yellow = Color.FromArgb(255, 224, 102);
@@ -746,7 +837,8 @@ namespace HbAi.XboxDns
             }
         }
 
-        static Color ResultColor(string r, Color bad) { return r == Probe.Ok ? OkGreen : r == Probe.Captcha ? Yellow : bad; }
+        // «напрямую» — серым: сервис этот сайт не трогает, это не успех и не поломка
+        static Color ResultColor(string r, Color bad) { return r == Probe.Ok ? OkGreen : r == Probe.Captcha ? Yellow : r == Probe.Direct ? Muted : bad; }
 
         // кнопка группы ВКонтакте (или «Скачать версию …», если вышла новая) и подвал
         void DrawFooter(Graphics g)

@@ -1,6 +1,8 @@
 # HB AI · Smart DNS — ChatGPT, Claude, Gemini и ElevenLabs одной кнопкой
 
-Gemini, ElevenLabs или ChatGPT пишут «недоступно в вашей стране»? Эта бесплатная программа для Windows 10/11 (есть и [версия для Mac](#для-mac)) одной кнопкой включает Smart DNS — [Comss.one](https://www.comss.ru/), [GeoHide](https://geohide.ru/) или [MagicDNS](https://magicdns.ru/), — и сервисы, которые сами ограничили работу в России, открываются как обычно. Остальной интернет при этом идёт напрямую: банки, Госуслуги и маркетплейсы работают как раньше.
+Gemini, ElevenLabs или ChatGPT пишут «недоступно в вашей стране»? Эта бесплатная программа для Windows 10/11 (есть и [версия для Mac](#для-mac)) одной кнопкой включает Smart DNS — [GeoHide](https://geohide.ru/) или [MagicDNS](https://magicdns.ru/), — и сервисы, которые сами ограничили работу в России, открываются как обычно. Остальной интернет при этом идёт напрямую: банки, Госуслуги и маркетплейсы работают как раньше.
+
+> **Версия 1.24, 14 ноября 2026.** Исправлена проверка. Раньше программа писала «открывается», даже когда сервис отдавал настоящий адрес сайта и ничего не подменял: так вышло с Comss.one. Теперь она сверяет адрес от сервиса с обычными DNS и в таком случае пишет «напрямую»: сайт идёт мимо сервиса, как без программы. «Найти лучший» такие сайты открывшимися не считает. Вторая поправка: сервис отдаёт на каждый сайт несколько адресов своих узлов, и часть узлов бывает мёртвой. Раньше программа смотрела только первый адрес и через раз писала «нет связи», теперь идёт к следующему, как браузер. Comss.one убран: к 14 ноября 2026 он перестал открывать нейросети, на его странице так и написано. Если у вас стоят адреса Comss, программа скажет об этом и по нажатию кнопки поставит рабочие. По проверке из Москвы 14.11.2026 GeoHide открывает ChatGPT, Claude, ElevenLabs и Grok, но три-четыре его узла из семи не отвечали, поэтому страница может открыться не с первого раза. MagicDNS в этот день не отвечал. Версия для Mac обновлена так же.
 
 > **Версия 1.23, 6 ноября 2026.** Адреса сервисов обновлены по проверке из России 06.11.2026. MagicDNS 4 ноября переехал на новые серверы: старые адреса молчат, в программе теперь новые `109.120.177.170` и `45.88.163.92`. Через них сейчас открываются ChatGPT, ElevenLabs, Grok и Perplexity, а Claude и Gemini — нет. У GeoHide замолчал второй адрес `45.13.237.213`, вместо него `5.175.161.40`. Comss.one открывает всё, как раньше. Если у вас остались старые адреса MagicDNS или GeoHide, программа так и пишет и по нажатию кнопки ставит рабочие. Версия для Mac обновлена так же.
 
@@ -20,9 +22,9 @@ Gemini, ElevenLabs или ChatGPT пишут «недоступно в ваше�
 2. Если Windows напишет «Windows защитила ваш компьютер», нажмите **Подробнее** → **Выполнить в любом случае**, а на вопрос о правах администратора — **Да**.
 3. Выберите сервис и нажмите большую кнопку в окне программы.
 
-Не скачивается по кнопке? Прямые ссылки: [для Windows](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Xbox_DNS.exe) · 230 КБ · Windows 10/11, [для Mac](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Smart_DNS_mac.zip) · 870 КБ · macOS 13+. Бесплатно, открытый код.
+Не скачивается по кнопке? Прямые ссылки: [для Windows](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Xbox_DNS.exe) · 235 КБ · Windows 10/11, [для Mac](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Smart_DNS_mac.zip) · 870 КБ · macOS 13+. Бесплатно, открытый код.
 
-<img src="docs/screenshot.png" width="360" alt="Окно программы HB AI Smart DNS: кнопка включения, выбор сервиса Comss.one, GeoHide, GeoHide EU, Xbox">
+<img src="docs/screenshot.png" width="360" alt="Окно программы HB AI Smart DNS: кнопка включения, выбор сервиса GeoHide, MagicDNS, Xbox и результат проверки по сайтам">
 
 Не нужно искать адреса DNS и вручную менять настройки сетевого адаптера. Сделано в сообществе [«Нейросети и AI на практике»](https://vk.com/neiroseti_ai).
 
@@ -31,15 +33,16 @@ Gemini, ElevenLabs или ChatGPT пишут «недоступно в ваше�
 - Включает Smart DNS на всех активных сетевых подключениях, а выключает, возвращая обычный DNS от роутера или провайдера.
 - Даёт выбрать сервис:
 
-| Кнопка | Адреса | Что открывает (проверено 06.11.2026 из Москвы, МГТС) |
+| Кнопка | Адреса | Что открывает (проверено 14.11.2026 из Москвы, МГТС) |
 |---|---|---|
-| Comss | `94.250.253.55`, `212.109.195.93` | ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity |
-| GeoHide EU | `143.20.64.192`, `5.175.161.40` | ChatGPT, Claude, Grok, Perplexity; ElevenLabs — через раз; Gemini — капча Google |
-| MagicDNS | `109.120.177.170`, `45.88.163.92` | ChatGPT, ElevenLabs, Grok, Perplexity; Claude и Gemini — пока нет |
+| GeoHide EU | `143.20.64.192`, `5.175.161.40` | ChatGPT, Claude, ElevenLabs, Grok; Gemini — капча Google. Три-четыре узла из семи не отвечали: страница может открыться не сразу |
+| MagicDNS | `109.120.177.170`, `45.88.163.92` | 14.11.2026 не отвечал; 06.11.2026 открывал ChatGPT, ElevenLabs и Grok |
 | Xbox | `111.88.96.54`, `111.88.96.55` | только Xbox Live, нейросети — нет |
 
-- Кнопка **«Проверить»** спрашивает DNS выбранного сервиса напрямую, подключается к выданному адресу и показывает по каждому сайту: открывается, блок страны, капча Google или нет связи. DNS для этого включать не обязательно.
-- Кнопка **«Найти лучший»** делает то же для всех сервисов сразу и переключает программу на тот, где открывается больше всего сайтов.
+Что открывает каждый сервис, меняется за дни. Таблица — снимок на дату, точную картину даёт кнопка «Проверить».
+
+- Кнопка **«Проверить»** спрашивает DNS выбранного сервиса напрямую, подключается к выданному адресу и показывает по каждому сайту: открывается, напрямую (сервис этот сайт не подменяет, он идёт как без программы), блок страны, капча Google или нет связи. DNS для этого включать не обязательно.
+- Кнопка **«Найти лучший»** делает то же для всех сервисов сразу и переключает программу на тот, где открывается больше всего сайтов. Сайты с пометкой «напрямую» в счёт не идут.
 
 - При запуске показывает, что сейчас включено.
 - После каждого переключения очищает кэш DNS.
@@ -74,7 +77,7 @@ certutil -hashfile HB_AI_Xbox_DNS.exe SHA256
 
 ```powershell
 # включить
-Set-DnsClientServerAddress -InterfaceIndex <подключение> -ServerAddresses ('94.250.253.55','212.109.195.93')
+Set-DnsClientServerAddress -InterfaceIndex <подключение> -ServerAddresses ('143.20.64.192','5.175.161.40')
 # только если у провайдера есть IPv6: выключить его на время Smart DNS (подключение запоминается)
 Disable-NetAdapterBinding -Name <подключение> -ComponentID ms_tcpip6
 # выключить
@@ -91,7 +94,7 @@ Clear-DnsClientCache
 
 ## IPv6
 
-Smart DNS-сервисы (Comss.one, GeoHide, MagicDNS) работают только по IPv4. Если провайдер даёт IPv6, Windows может спрашивать IPv6-DNS провайдера и ходить к сайтам напрямую — тогда сайт пишет «недоступно в вашей стране», хотя DNS включён. Программа сама выключает IPv6 на время Smart DNS. Если хотите сделать это вручную:
+Smart DNS-сервисы (GeoHide, MagicDNS) работают только по IPv4. Если провайдер даёт IPv6, Windows может спрашивать IPv6-DNS провайдера и ходить к сайтам напрямую — тогда сайт пишет «недоступно в вашей стране», хотя DNS включён. Программа сама выключает IPv6 на время Smart DNS. Если хотите сделать это вручную:
 
 1. Нажмите <kbd>Win</kbd>+<kbd>R</kbd>, введите `ncpa.cpl`, нажмите Enter — откроются сетевые подключения.
 2. Правой кнопкой по подключению, через которое вы в интернете (Wi-Fi или Ethernet) → **Свойства**.
@@ -116,13 +119,13 @@ networksetup -setv6automatic Wi-Fi   # вернуть
 ## Частые вопросы
 
 **Gemini пишет, что недоступен в вашей стране. Поможет?**
-Да, это ровно тот случай. Comss.one и GeoHide отправляют адреса Gemini и Google AI Studio через свой сервер за границей, и сервис открывается.
+Зависит от сервиса и от дня. 14.11.2026 через GeoHide Gemini упирался в капчу Google, а MagicDNS не отвечал. Нажмите «Найти лучший»: программа покажет, что открывается сегодня.
 
 **ElevenLabs перекидывает на страницу «not available in your country»**
-Напрямую так и есть. С включённым DNS ElevenLabs открывается нормально, это мы тоже проверили.
+Напрямую так и есть. Через Smart DNS зависит от сервиса и дня: 14.11.2026 ElevenLabs открывался через GeoHide. Проверьте кнопкой «Проверить».
 
 **Работают ли ChatGPT и Claude?**
-Да, через любой из четырёх сервисов для нейросетей. Если какой-то сайт не открывается, нажмите «Найти лучший»: программа проверит все сервисы и включит рабочий.
+Да, через сервис для нейросетей, который сейчас работает. Если какой-то сайт не открывается, нажмите «Найти лучший»: программа проверит все сервисы и включит рабочий.
 
 **Почему убрали российский узел GeoHide?**
 23.10.2026 его DNS отвечал, но прокси-адреса, которые он выдаёт (193.233.112.x, 159.194.200.33), из России не открывались. Европейский узел GeoHide работает, он в программе остался.
@@ -143,7 +146,7 @@ DNS в Windows меняется только с правами админист�
 С 10 октября 2026 года xbox-dns.ru на запросы к нейросетям отвечает `0.0.0.0`, так же отвечает и его зашифрованный DNS. Это решение сервиса, а не провайдера. Для Xbox Live он по-прежнему работает.
 
 **Как включить Smart DNS вручную, без программы?**
-Параметры → Сеть и Интернет → свойства подключения → Изменить назначение DNS-сервера → вписать, например, `94.250.253.55` и `212.109.195.93` (Comss.one). Программа делает то же самое одной кнопкой и сразу для всех подключений.
+Параметры → Сеть и Интернет → свойства подключения → Изменить назначение DNS-сервера → вписать, например, `143.20.64.192` и `5.175.161.40` (GeoHide). Программа делает то же самое одной кнопкой и сразу для всех подключений.
 
 ## Сборка из исходников
 
@@ -157,13 +160,13 @@ build.bat
 
 ## Важно
 
-- Программа не связана с Comss.one, GeoHide, MagicDNS и xbox-dns.ru. Это бесплатные сервисы: доступ через них может пропасть в любой момент. Адреса в программе мы проверяем скриптом `tools/probe_dns.py` и обновляем.
+- Программа не связана с GeoHide, MagicDNS и xbox-dns.ru. Это бесплатные сервисы: доступ через них может пропасть в любой момент. Адреса в программе мы проверяем скриптом `tools/probe_dns.py` и обновляем.
 - Пользуйтесь сервисами по их правилам. Ресурсы, заблокированные в России, программа не открывает.
 - Всё, что вы делаете с программой, вы делаете на свой риск.
 
 ## In English
 
-**HB AI · Smart DNS** is a free, open-source one-click Smart DNS switcher for Windows 10/11. It sets Comss.one, GeoHide, MagicDNS or xbox-dns.ru DNS servers on all active network adapters (or resets them back to automatic), so services that restrict access from Russia — Gemini, ElevenLabs, ChatGPT, Claude — open normally, while all other traffic goes directly. No VPN, no background service, no installation: a single 230 KB exe that runs PowerShell commands (`Set-DnsClientServerAddress`, `Clear-DnsClientCache`, and `Disable/Enable-NetAdapterBinding` for IPv6 when the ISP provides it), checks GitHub for a newer release on start, and has a built-in reachability check for ChatGPT, Claude, Gemini, ElevenLabs, Grok and Perplexity. Written in C#, MIT license. [Download the latest release](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Xbox_DNS.exe).
+**HB AI · Smart DNS** is a free, open-source one-click Smart DNS switcher for Windows 10/11. It sets GeoHide, MagicDNS or xbox-dns.ru DNS servers on all active network adapters (or resets them back to automatic), so services that restrict access from Russia — Gemini, ElevenLabs, ChatGPT, Claude — open normally, while all other traffic goes directly. No VPN, no background service, no installation: a single 235 KB exe that changes the same settings as `Set-DnsClientServerAddress`, `Clear-DnsClientCache`, and `Disable/Enable-NetAdapterBinding` (for IPv6 when the ISP provides it) directly through Windows CIM, checks GitHub for a newer release on start, and has a built-in reachability check for ChatGPT, Claude, Gemini, ElevenLabs, Grok and Perplexity. Written in C#, MIT license. [Download the latest release](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Xbox_DNS.exe).
 
 ## Лицензия
 

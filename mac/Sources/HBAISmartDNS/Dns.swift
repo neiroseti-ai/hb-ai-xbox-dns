@@ -1,32 +1,34 @@
 import Foundation
 
-// Сервисы Smart DNS. Список тот же, что в XboxDns.cs (проверено 06.11.2026 из России): Comss.one открывает всё;
-// GeoHide Европа — всё, кроме Gemini (капча), ElevenLabs через раз; MagicDNS переехал 04.11.2026 на новые адреса,
-// Claude и Gemini через него пока не открываются. Astracat убран в 1.22, старые MagicDNS и 45.13.237.213 — в 1.23.
+// Сервисы Smart DNS. Список тот же, что в XboxDns.cs (проверено 14.11.2026 из России): GeoHide Европа открывает
+// ChatGPT, Claude, ElevenLabs и Grok, но три-четыре его узла из семи не отвечали; Gemini — капча. MagicDNS
+// 14.11.2026 не отвечал. Comss.one убран в 1.24: к 14.11.2026 он стал отдавать настоящие адреса нейросетей, без подмены.
+// Astracat убран в 1.22, старые MagicDNS и 45.13.237.213 — в 1.23.
 enum Services {
-    static let name = ["Comss.one", "GeoHide EU", "MagicDNS", "Xbox DNS"]
-    static let short = ["Comss", "GeoHide", "MagicDNS", "Xbox"]
+    static let name = ["GeoHide EU", "MagicDNS", "Xbox DNS"]
+    static let short = ["GeoHide", "MagicDNS", "Xbox"]
     static let v4: [[String]] = [
-        ["94.250.253.55", "212.109.195.93"],
         ["143.20.64.192", "5.175.161.40"],
         ["109.120.177.170", "45.88.163.92"],
         ["111.88.96.54", "111.88.96.55"],
     ]
+    // Что сервис открывает, меняется за дни, поэтому подпись отсылает к кнопке «Проверить».
     static let opens = [
-        "ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity",
-        "ChatGPT, Claude, Grok, Perplexity; ElevenLabs — через раз, Gemini — капча",
-        "ChatGPT, ElevenLabs, Grok, Perplexity; Claude и Gemini — пока нет",
+        "ChatGPT, Claude, ElevenLabs, Grok; Gemini — капча. Точнее — «Проверить»",
+        "ChatGPT, ElevenLabs, Grok — когда отвечает. Сначала «Проверить»",
         "только Xbox Live, нейросети — нет",
     ]
-    static let site = ["comss.ru", "geohide.ru", "magicdns.ru", "xbox-dns.ru"]
-    static let url = ["https://www.comss.ru/", "https://geohide.ru/", "https://magicdns.ru/", "https://xbox-dns.ru/"]
-    static let xboxSet = 3
+    static let site = ["geohide.ru", "magicdns.ru", "xbox-dns.ru"]
+    static let url = ["https://geohide.ru/", "https://magicdns.ru/", "https://xbox-dns.ru/"]
+    static let xboxSet = 2
     static var count: Int { name.count }
-    // адреса из прежних версий, которые ещё работают: xbox-dns.ru 1.0 и прежний основной адрес Comss (до 1.22)
-    static let oldSets: [String: Int] = ["111.88.96.50": 3, "111.88.96.51": 3, "83.220.169.155": 0]
-    // нерабочие адреса прежних версий: российский узел GeoHide (1.1) и Astracat (1.2–1.21) — их не выдаём за сервис
+    // адреса из прежних версий, которые ещё работают: xbox-dns.ru 1.0
+    static let oldSets: [String: Int] = ["111.88.96.50": 2, "111.88.96.51": 2]
+    // адреса прежних версий, через которые нейросети не открываются: российский узел GeoHide (1.1), Astracat (1.2–1.21),
+    // Comss.one (1.1–1.23) — их не выдаём за сервис, а предлагаем поставить рабочие
     static let stale: Set<String> = ["159.194.200.33", "193.233.112.67", "135.106.217.200", "85.209.2.112",
-                                     "109.120.132.43", "94.249.177.102", "45.13.237.213"]   // + MagicDNS до 04.11.2026 и второй GeoHide из 1.22
+                                     "109.120.132.43", "94.249.177.102", "45.13.237.213",   // MagicDNS до 04.11.2026 и второй GeoHide из 1.22
+                                     "94.250.253.55", "212.109.195.93", "83.220.169.155"]   // Comss.one: с 14.11.2026 адреса нейросетей не подменяет
 
     /// Какому сервису принадлежит адрес DNS; nil — чужой адрес.
     static func setOf(_ address: String) -> Int? {
@@ -185,7 +187,7 @@ enum Dns {
 // Новая версия: GitHub отвечает на /releases/latest переадресацией на /releases/tag/vX.YY — из неё берём номер.
 // Без API и без ключей, один запрос при запуске; не получилось — молчим.
 final class Updates: NSObject, URLSessionTaskDelegate {
-    static let version = "1.23"
+    static let version = "1.24"
     static let page = "https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest"
 
     /// Номер версии из адреса переадресации; nil — адрес не про релиз.

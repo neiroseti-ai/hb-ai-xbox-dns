@@ -244,6 +244,7 @@ struct ContentView: View {
         guard let r = r else { return Color(red: 70 / 255, green: 70 / 255, blue: 88 / 255) }
         if r == Probe.ok { return Palette.green }
         if r == Probe.captcha { return Palette.yellow }
+        if r == Probe.direct { return Palette.muted }   // сервис этот сайт не трогает: не успех и не поломка
         return Palette.red
     }
 

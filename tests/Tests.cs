@@ -28,6 +28,7 @@ namespace HbAi.XboxDns
         static int Main()
         {
             DnsReplies();
+            RealAddress();
             BestService();
             KnownAddresses();
             SiteAnswers();
@@ -75,7 +76,13 @@ namespace HbAi.XboxDns
         // header — поправить заголовок ответа (номер запроса, код ответа); silentFirst — первый запрос «потерять»
         static string Ask(string host, Func<byte[], byte[][]> answers, Action<List<byte>> header = null, bool silentFirst = false)
         {
-            var srv = new UdpClient(new IPEndPoint(IPAddress.Loopback, 53));
+            return Served(answers, () => Probe.Resolve("127.0.0.1", host), header, silentFirst);
+        }
+
+        // подставной сервер отвечает на один запрос (на второй, если silentFirst), пока выполняется call
+        static X Served<X>(Func<byte[], byte[][]> answers, Func<X> call, Action<List<byte>> header = null, bool silentFirst = false, string bind = "127.0.0.1")
+        {
+            var srv = new UdpClient(new IPEndPoint(IPAddress.Parse(bind), 53));
             var th = new Thread(() =>
             {
                 try
@@ -94,8 +101,19 @@ namespace HbAi.XboxDns
                 catch (SocketException) { }
             });
             th.IsBackground = true; th.Start();
-            try { return Probe.Resolve("127.0.0.1", host); }
+            try { return call(); }
             finally { srv.Close(); th.Join(1000); }
+        }
+
+        static readonly byte[][] TwoA = { Rr(ToQuestion, 1, new byte[] { 8, 47, 69, 0 }), Rr(ToQuestion, 1, new byte[] { 8, 6, 112, 0 }) };
+
+        // обычные DNS для сверки на время теста — подставной сервер
+        static X WithControl<X>(Func<X> call)
+        {
+            var saved = Probe.Control;
+            Probe.Control = new[] { "127.0.0.1" };
+            try { return call(); }
+            finally { Probe.Control = saved; }
         }
 
         static void DnsReplies()
@@ -146,6 +164,179 @@ namespace HbAi.XboxDns
 
             T("DNS: сервер молчит", () =>
                 Eq(Probe.NoDns, Probe.Verdict(Ask("grok.com", q => null))));
+
+            T("DNS: в ответе два адреса — возвращаются оба, по порядку", () =>
+                Eq("8.47.69.0,8.6.112.0", string.Join(",", Served(q => TwoA, () => Probe.ResolveAll("127.0.0.1", "chatgpt.com")))));
+
+            T("DNS: из двух адресов первым считается первый", () =>
+                Eq("8.47.69.0", Ask("chatgpt.com", q => TwoA)));
+
+            T("DNS: CNAME между адресами не теряет второй адрес", () =>
+                Eq("1.1.1.1,2.2.2.2", string.Join(",", Served(q => new[] {
+                    Rr(ToQuestion, 1, new byte[] { 1, 1, 1, 1 }), Rr(ToQuestion, 5, Name("edge.cdn.net")), Rr(ToQuestion, 1, new byte[] { 2, 2, 2, 2 }) },
+                    () => Probe.ResolveAll("127.0.0.1", "claude.ai")))));
+
+            T("DNS: адрес есть, а следующая запись оборвана — адрес не теряется", () =>
+                Eq("1.2.3.4", Ask("grok.com", q =>
+                {
+                    var cut = Rr(ToQuestion, 5, Name("edge.cdn.net"));
+                    cut[11] = 60;   // длина данных 60 байт, а в пакете их меньше
+                    return new[] { Rr(ToQuestion, 1, new byte[] { 1, 2, 3, 4 }), cut };
+                })));
+
+            T("DNS: ответ без адресов — пустой список, а не «не ответил»", () =>
+                Eq(0, Served(q => new byte[0][], () => Probe.ResolveAll("127.0.0.1", "grok.com")).Length));
+
+            T("DNS: сервер молчит — списка нет", () =>
+                Eq(null, Served(q => null, () => Probe.ResolveAll("127.0.0.1", "grok.com"))));
+        }
+
+        // ---------- сверка с обычными DNS: подменяет ли сервис адрес сайта ----------
+
+        static void RealAddress()
+        {
+            T("Сверка: настоящие адреса сайта — всё, что ответил обычный DNS", () =>
+            {
+                var real = WithControl(() => Served(q => TwoA, () => Probe.Real("chatgpt.com")));
+                Eq("8.47.69.0,8.6.112.0", string.Join(",", real.OrderBy(x => x == "8.47.69.0" ? 0 : 1)));
+            });
+
+            T("Сверка: обычные DNS молчат — настоящих адресов нет, сверять не с чем", () =>
+                Eq(0, WithControl(() => Served(q => null, () => Probe.Real("chatgpt.com"))).Count));
+
+            T("Сверка: ответы разных обычных DNS складываются", () =>
+            {
+                var saved = Probe.Control;
+                Probe.Control = new[] { "127.0.0.1", "127.0.0.2" };
+                try
+                {
+                    var real = Served(q => new[] { Rr(ToQuestion, 1, new byte[] { 8, 47, 69, 0 }) },
+                        () => Served(q => new[] { Rr(ToQuestion, 1, new byte[] { 104, 18, 26, 48 }) },
+                            () => Probe.Real("www.perplexity.ai"), null, false, "127.0.0.2"));
+                    Eq("104.18.26.48,8.47.69.0", string.Join(",", real.OrderBy(x => x, StringComparer.Ordinal)));
+                }
+                finally { Probe.Control = saved; }
+            });
+
+            T("Сверка: первый запрос обычному DNS потерялся — второй находит адреса", () =>
+                Eq(2, WithControl(() => Served(q => TwoA, () => Probe.Real("chatgpt.com"), null, true)).Count));
+
+            T("Сверка идёт у трёх разных DNS, а не у одного", () =>
+                Eq(3, Probe.Control.Distinct().Count()));
+
+            T("Сервисы «Кнопки» в обычные DNS для сверки не попали", () =>
+                Eq(false, Probe.Control.Any(c => Dns.SetOf(c) >= 0 || Dns.IsStale(c))));
+
+            var real2 = new HashSet<string> { "8.47.69.0", "8.6.112.0" };
+            var none = new HashSet<string>();
+
+            T("Сервис отдал настоящий адрес, сайт ответил без слов о стране — «напрямую», а не «открывается»", () =>
+                Eq(Probe.Direct, Probe.Through(Probe.Ok, "8.6.112.0", real2)));
+
+            T("Сервис подменил адрес, сайт ответил — «открывается»", () =>
+                Eq(Probe.Ok, Probe.Through(Probe.Ok, "143.20.64.192", real2)));
+
+            T("Настоящий адрес, сайт сам назвал блок страны — остаётся «блок страны»", () =>
+                Eq(Probe.Blocked, Probe.Through(Probe.Blocked, "8.6.112.0", real2)));
+
+            T("Настоящий адрес, связи нет — остаётся «нет связи»", () =>
+                Eq(Probe.NoLink, Probe.Through(Probe.NoLink, "8.6.112.0", real2)));
+
+            T("Настоящий адрес, капча — остаётся «капча Google»", () =>
+                Eq(Probe.Captcha, Probe.Through(Probe.Captcha, "8.6.112.0", real2)));
+
+            T("Сверять не с чем — верим ответу сайта, как раньше", () =>
+                Eq(Probe.Ok, Probe.Through(Probe.Ok, "8.6.112.0", none)));
+
+            T("Адрес из той же сети /24, что настоящий, — тоже настоящий: «напрямую»", () =>
+                Eq(Probe.Direct, Probe.Through(Probe.Ok, "8.47.69.5", real2)));
+
+            T("Адрес из соседней сети — уже не настоящий", () =>
+                Eq(Probe.Ok, Probe.Through(Probe.Ok, "8.47.70.5", real2)));
+
+            T("Совпало только первое число адреса — не настоящий", () =>
+                Eq(Probe.Ok, Probe.Through(Probe.Ok, "8.9.9.9", real2)));
+
+            T("Сеть адреса — первые три числа", () => Eq("160.79.104", Probe.Net24("160.79.104.10")));
+
+            var two = new[] { "143.20.64.192", "5.175.161.40" };
+
+            T("Первый узел сервиса не отвечает, второй открывает сайт — «открывается», а не «нет связи»", () =>
+                Eq(Probe.Ok, Probe.Pick(two, new[] { Probe.NoLink, Probe.Ok }, real2)));
+
+            T("Не отвечает ни один узел — «нет связи»", () =>
+                Eq(Probe.NoLink, Probe.Pick(two, new[] { Probe.NoLink, Probe.NoLink }, real2)));
+
+            T("Берётся первый по порядку узел со связью, как в браузере, а не лучший ответ", () =>
+                Eq(Probe.Blocked, Probe.Pick(two, new[] { Probe.Blocked, Probe.Ok }, real2)));
+
+            T("Пустой список адресов — «нет связи» (до этого в программе не доходит: пустой ответ — «не пускает»)", () =>
+                Eq(Probe.NoLink, Probe.Pick(new string[0], new string[0], real2)));
+
+            T("Настоящий адрес после мёртвого — всё равно «напрямую»", () =>
+                Eq(Probe.Direct, Probe.Pick(new[] { "8.47.69.0", "8.6.112.0" }, new[] { Probe.NoLink, Probe.Ok }, real2)));
+
+            T("Сверка идёт по тому адресу, который ответил: подменённый — «открывается», хотя рядом настоящий", () =>
+                Eq(Probe.Ok, Probe.Pick(new[] { "8.6.112.0", "143.20.64.192" }, new[] { Probe.NoLink, Probe.Ok }, real2)));
+
+            // подставной сайт: по адресам из alive отвечает answer, по остальным связи нет
+            Func<string, string, Func<string, string, string>> web = (alive, answer) => (h, ip) => alive.Split(',').Contains(ip) ? answer : Probe.NoLink;
+            var six = new[] { "1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5", "6.6.6.6" };
+
+            T("Три узла сервиса мертвы, четвёртый открывает сайт — «открывается»", () =>
+                Eq(Probe.Ok, Probe.Reach("claude.ai", six, real2, web("4.4.4.4", Probe.Ok))));
+
+            T("Жив только пятый узел — «нет связи»: дальше четвёртого не идём", () =>
+                Eq(Probe.NoLink, Probe.Reach("claude.ai", six, real2, web("5.5.5.5,6.6.6.6", Probe.Ok))));
+
+            T("Спрашиваются ровно первые четыре адреса из ответа сервиса", () =>
+            {
+                var asked = new List<string>();
+                Probe.Reach("claude.ai", six, real2, (h, ip) => { lock (asked) asked.Add(ip); return Probe.NoLink; });
+                Eq("1.1.1.1,2.2.2.2,3.3.3.3,4.4.4.4", string.Join(",", asked.OrderBy(x => x)));
+            });
+
+            T("Сайт спрашивают по его имени", () =>
+                Eq(Probe.Ok, Probe.Reach("claude.ai", six, real2, (h, ip) => h == "claude.ai" ? Probe.Ok : Probe.NoLink)));
+
+            Func<string, ICollection<string>> noReal = h => { throw new Exception("настоящие адреса не нужны"); };
+            Func<string, string, string> noSite = (h, ip) => { throw new Exception("на сайт ходить не нужно"); };
+
+            T("Сервис не ответил — «DNS молчит», на сайт не ходим", () =>
+                Eq(Probe.NoDns, Probe.Judge("claude.ai", null, noReal, noSite)));
+
+            T("Сервис ответил без адресов — «не пускает», на сайт не ходим", () =>
+                Eq(Probe.Zero, Probe.Judge("claude.ai", new string[0], noReal, noSite)));
+
+            T("Сервис ответил 0.0.0.0 — «не пускает», на сайт не ходим", () =>
+                Eq(Probe.Zero, Probe.Judge("claude.ai", new[] { "0.0.0.0" }, noReal, noSite)));
+
+            T("Как Comss в ноябре 2026: адреса настоящие, сайт отвечает — «напрямую», а не «открывается»", () =>
+                Eq(Probe.Direct, Probe.Judge("chatgpt.com", new[] { "8.47.69.0", "8.6.112.0" },
+                    h => h == "chatgpt.com" ? (ICollection<string>)real2 : none, (h, ip) => Probe.Ok)));
+
+            T("Как GeoHide 14.11.2026: адреса узлов, первый мёртвый — «открывается»", () =>
+                Eq(Probe.Ok, Probe.Judge("claude.ai", new[] { "45.13.237.213", "5.175.161.40" },
+                    h => new HashSet<string> { "160.79.104.10" }, web("5.175.161.40", Probe.Ok))));
+
+            T("Настоящий адрес и отказ по стране от самого сайта — «блок страны»", () =>
+                Eq(Probe.Blocked, Probe.Judge("claude.ai", new[] { "160.79.104.10" },
+                    h => new HashSet<string> { "160.79.104.10" }, (h, ip) => Probe.Blocked)));
+
+            T("«Напрямую» не считается открывшимся сайтом", () =>
+                Eq(0, Probe.Good(Enumerable.Repeat(Probe.Direct, Probe.Host.Length).ToArray())));
+
+            T("Сервис, который всё пропускает напрямую, проигрывает тому, что открыл один сайт", () =>
+                Eq(1, Probe.Best(new[] { Enumerable.Repeat(Probe.Direct, Probe.Host.Length).ToArray(), Res(1), null }, 0)));
+
+            T("«Напрямую» рисуется серым: не зелёным, как успех, и не красным, как отказ", () =>
+            {
+                var color = typeof(MainForm).GetMethod("ResultColor", BindingFlags.NonPublic | BindingFlags.Static);
+                Func<string, Color> field = n => (Color)typeof(MainForm).GetField(n, BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
+                Eq(field("Muted"), (Color)color.Invoke(null, new object[] { Probe.Direct, Color.Red }));
+                Eq(field("OkGreen"), (Color)color.Invoke(null, new object[] { Probe.Ok, Color.Red }));
+                Eq(Color.Red, (Color)color.Invoke(null, new object[] { Probe.Blocked, Color.Red }));
+            });
         }
 
         // ---------- «Найти лучший» ----------
@@ -188,15 +379,23 @@ namespace HbAi.XboxDns
 
         static void KnownAddresses()
         {
-            T("Адрес MagicDNS узнаётся", () => Eq(2, Dns.SetOf("109.120.177.170")));
-            T("Второй адрес MagicDNS узнаётся", () => Eq(2, Dns.SetOf("45.88.163.92")));
-            T("Новый второй адрес GeoHide узнаётся", () => Eq(1, Dns.SetOf("5.175.161.40")));
+            T("Адрес MagicDNS узнаётся", () => Eq(1, Dns.SetOf("109.120.177.170")));
+            T("Второй адрес MagicDNS узнаётся", () => Eq(1, Dns.SetOf("45.88.163.92")));
+            T("Адрес GeoHide узнаётся", () => Eq(0, Dns.SetOf("143.20.64.192")));
+            T("Новый второй адрес GeoHide узнаётся", () => Eq(0, Dns.SetOf("5.175.161.40")));
             T("Старый адрес MagicDNS (до 04.11) не выдаётся за сервис", () => Eq(-1, Dns.SetOf("109.120.132.43")));
             T("Старые адреса MagicDNS помечены как старые", () => Eq(true, Dns.IsStale("109.120.132.43") && Dns.IsStale("94.249.177.102")));
             T("Замолчавший адрес GeoHide из 1.22 помечен как старый", () => Eq(true, Dns.IsStale("45.13.237.213")));
-            T("Второй адрес Comss узнаётся", () => Eq(0, Dns.SetOf("212.109.195.93")));
-            T("Новый основной адрес Comss узнаётся", () => Eq(0, Dns.SetOf("94.250.253.55")));
-            T("Прежний адрес Comss (до 1.22) узнаётся как Comss", () => Eq(0, Dns.SetOf("83.220.169.155")));
+            T("Адреса Comss из 1.22–1.23 за сервис не выдаются: нейросети он больше не открывает", () =>
+                Eq(true, Dns.SetOf("94.250.253.55") == -1 && Dns.SetOf("212.109.195.93") == -1));
+            T("Прежний адрес Comss (до 1.22) за сервис не выдаётся", () => Eq(-1, Dns.SetOf("83.220.169.155")));
+            T("Адреса Comss помечены как старые — программа предложит поставить рабочие", () =>
+                Eq(true, Dns.IsStale("94.250.253.55") && Dns.IsStale("212.109.195.93") && Dns.IsStale("83.220.169.155")));
+            T("Рабочие адреса GeoHide не старые", () => Eq(false, Dns.IsStale("143.20.64.192") || Dns.IsStale("5.175.161.40")));
+            T("У каждого сервиса есть адреса, подпись, сайт и ссылка", () =>
+                Eq(true, new[] { Dns.Short.Length, Dns.V4.Length, Dns.V6.Length, Dns.Opens.Length, Dns.Site.Length, Dns.Url.Length }.All(n => n == Dns.Count)));
+            T("Xbox DNS стоит на своём номере", () => Eq("Xbox DNS", Dns.Name[Dns.XboxSet]));
+            T("Первым в списке, который включает кнопка, стоит сервис для нейросетей", () => Eq("GeoHide EU", Dns.Name[0]));
             T("IPv6 Xbox с зоной и заглавными буквами узнаётся", () => Eq(Dns.XboxSet, Dns.SetOf("2A00:AB00:1233:26::51%12")));
             T("Адрес Xbox DNS из версии 1.0 узнаётся", () => Eq(Dns.XboxSet, Dns.SetOf("111.88.96.50")));
             T("Нерабочий адрес GeoHide из версии 1.1 не выдаётся за сервис", () => Eq(-1, Dns.SetOf("193.233.112.67")));
@@ -319,9 +518,9 @@ namespace HbAi.XboxDns
 
         static void AfterSwitch()
         {
-            T("Включили нужный сервис — ошибки нет", () => Eq(null, MainForm.Outcome(true, MainForm.Reached(true, 2, 2), null, true)));
-            T("Хотели MagicDNS, а встал Comss — это сбой", () => Eq(false, MainForm.Reached(true, 2, 0)));
-            T("Выключили — сервиса нет, ошибки нет", () => Eq(null, MainForm.Outcome(false, MainForm.Reached(false, 2, -1), null, true)));
+            T("Включили нужный сервис — ошибки нет", () => Eq(null, MainForm.Outcome(true, MainForm.Reached(true, 1, 1), null, true)));
+            T("Хотели MagicDNS, а встал GeoHide — это сбой", () => Eq(false, MainForm.Reached(true, 1, 0)));
+            T("Выключили — сервиса нет, ошибки нет", () => Eq(null, MainForm.Outcome(false, MainForm.Reached(false, 1, -1), null, true)));
             T("Включили, но IPv6 не выключился — «DNS включён, но: …»", () =>
                 Eq("DNS включён, но: IPv6 не выключился на «Wi-Fi»: нет доступа", MainForm.Outcome(true, true, "IPv6 не выключился на «Wi-Fi»: нет доступа", true)));
             T("Выключили, но IPv6 не вернулся — «DNS выключен, но: …», а не «включён»", () =>
@@ -382,7 +581,7 @@ namespace HbAi.XboxDns
             return (string)typeof(Dns).GetMethod("Restore6", BindingFlags.NonPublic | BindingFlags.Static)
                 .Invoke(null, new object[] { net, f, new Dns.Errors() });
         }
-        const int Magic = 2;
+        const int Magic = 1;
         const string MagicDns = "dns6 10 reset; dns 10 109.120.177.170,45.88.163.92";
 
         static void Switching()
@@ -416,7 +615,7 @@ namespace HbAi.XboxDns
                 var net = new FakeNet("Wi-Fi"); string f = ListFile();
                 Dns.Enable(Magic, net, f); net.Take();
                 Dns.Enable(0, net, f);
-                Eq("dns 10 94.250.253.55,212.109.195.93", net.Take());
+                Eq("dns 10 143.20.64.192,5.175.161.40", net.Take());
                 Dns.Disable(net, f);
                 Eq("dns 10 reset; v6on Wi-Fi", net.Take());
                 Dns.Disable(net, f);

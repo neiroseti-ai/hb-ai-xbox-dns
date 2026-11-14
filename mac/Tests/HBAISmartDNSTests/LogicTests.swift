@@ -8,13 +8,15 @@ final class LogicTests: XCTestCase {
     // ---------- адреса ----------
 
     func testServiceAddresses() {
-        XCTAssertEqual(Services.setOf("109.120.177.170"), 2)
-        XCTAssertEqual(Services.setOf("45.88.163.92"), 2)
-        XCTAssertEqual(Services.setOf("5.175.161.40"), 1)
+        XCTAssertEqual(Services.setOf("109.120.177.170"), 1)
+        XCTAssertEqual(Services.setOf("45.88.163.92"), 1)
+        XCTAssertEqual(Services.setOf("143.20.64.192"), 0)
+        XCTAssertEqual(Services.setOf("5.175.161.40"), 0)
+        XCTAssertEqual(Services.name[0], "GeoHide EU", "первым стоит сервис для нейросетей")
         XCTAssertNil(Services.setOf("109.120.132.43"), "старый MagicDNS не выдаётся за сервис")
-        XCTAssertEqual(Services.setOf("94.250.253.55"), 0)
-        XCTAssertEqual(Services.setOf("212.109.195.93"), 0)
-        XCTAssertEqual(Services.setOf("83.220.169.155"), 0, "прежний адрес Comss узнаётся")
+        XCTAssertNil(Services.setOf("94.250.253.55"), "Comss не выдаётся за сервис: нейросети он больше не открывает")
+        XCTAssertNil(Services.setOf("212.109.195.93"))
+        XCTAssertNil(Services.setOf("83.220.169.155"), "прежний адрес Comss тоже")
         XCTAssertEqual(Services.setOf("111.88.96.50"), Services.xboxSet, "старый Xbox DNS узнаётся")
         XCTAssertNil(Services.setOf("192.168.1.1"))
         XCTAssertNil(Services.setOf("135.106.217.200"), "Astracat не выдаётся за сервис")
@@ -27,6 +29,11 @@ final class LogicTests: XCTestCase {
         XCTAssertTrue(Services.isStale("109.120.132.43"))
         XCTAssertTrue(Services.isStale("94.249.177.102"))
         XCTAssertTrue(Services.isStale("45.13.237.213"))
+        XCTAssertTrue(Services.isStale("94.250.253.55"), "адреса Comss помечены как старые")
+        XCTAssertTrue(Services.isStale("212.109.195.93"))
+        XCTAssertTrue(Services.isStale("83.220.169.155"))
+        XCTAssertFalse(Services.isStale("143.20.64.192"))
+        XCTAssertFalse(Services.isStale("5.175.161.40"))
         XCTAssertFalse(Services.isStale("109.120.177.170"))
         XCTAssertFalse(Services.isStale("192.168.1.1"))
     }
@@ -50,6 +57,57 @@ final class LogicTests: XCTestCase {
         XCTAssertNil(Probe.verdict("1.2.3.4"))
     }
 
+    func testDigAll() {
+        XCTAssertEqual(Probe.parseDigAll("8.47.69.0\n8.6.112.0\n", timedOut: false), ["8.47.69.0", "8.6.112.0"], "оба адреса, по порядку")
+        XCTAssertEqual(Probe.parseDig("8.47.69.0\n8.6.112.0\n", timedOut: false), "8.47.69.0", "первым считается первый")
+        XCTAssertEqual(Probe.parseDigAll("edge.cdn.net.\n1.2.3.4\n", timedOut: false), ["1.2.3.4"], "CNAME — не адрес")
+        XCTAssertEqual(Probe.parseDigAll("", timedOut: false), [], "ответ без адресов — пустой список")
+        XCTAssertNil(Probe.parseDigAll("", timedOut: true))
+        XCTAssertNil(Probe.parseDigAll(";; connection timed out; no servers could be reached", timedOut: false))
+    }
+
+    // ---------- сверка с обычными DNS: подменяет ли сервис адрес сайта ----------
+
+    func testThrough() {
+        let real: Set<String> = ["8.47.69.0", "8.6.112.0"]
+        XCTAssertEqual(Probe.through(Probe.ok, "8.6.112.0", real), Probe.direct, "настоящий адрес — «напрямую», а не «открывается»")
+        XCTAssertEqual(Probe.through(Probe.ok, "143.20.64.192", real), Probe.ok, "сервис подменил адрес — «открывается»")
+        XCTAssertEqual(Probe.through(Probe.blocked, "8.6.112.0", real), Probe.blocked, "блок страны сайт назвал сам")
+        XCTAssertEqual(Probe.through(Probe.noLink, "8.6.112.0", real), Probe.noLink)
+        XCTAssertEqual(Probe.through(Probe.captcha, "8.6.112.0", real), Probe.captcha)
+        XCTAssertEqual(Probe.through(Probe.ok, "8.6.112.0", []), Probe.ok, "сверять не с чем — верим ответу сайта")
+        XCTAssertEqual(Probe.through(Probe.ok, "8.47.69.5", real), Probe.direct, "адрес из той же сети /24 — тоже настоящий")
+        XCTAssertEqual(Probe.through(Probe.ok, "8.47.70.5", real), Probe.ok, "соседняя сеть — уже не настоящий")
+        XCTAssertEqual(Probe.through(Probe.ok, "8.9.9.9", real), Probe.ok, "совпало только первое число — не настоящий")
+        XCTAssertEqual(Probe.net24("160.79.104.10"), "160.79.104")
+    }
+
+    func testReachTriesNextNode() {
+        let real: Set<String> = ["8.47.69.0", "8.6.112.0"]
+        let two = ["143.20.64.192", "5.175.161.40"]
+        var asked: [String] = []
+        let secondAlive: (String, String) -> String = { _, ip in asked.append(ip); return ip == "5.175.161.40" ? Probe.ok : Probe.noLink }
+        XCTAssertEqual(Probe.reach("claude.ai", two, real, ask: secondAlive), Probe.ok, "первый узел молчит, второй открывает")
+        XCTAssertEqual(asked, two, "узлы спрашиваются по порядку")
+        XCTAssertEqual(Probe.reach("claude.ai", two, real, ask: { _, _ in Probe.noLink }), Probe.noLink, "не отвечает ни один узел")
+        XCTAssertEqual(Probe.reach("claude.ai", two, real, ask: { _, ip in ip == "143.20.64.192" ? Probe.blocked : Probe.ok }), Probe.blocked,
+                       "берётся первый узел со связью, а не лучший ответ")
+        XCTAssertEqual(Probe.reach("chatgpt.com", ["8.47.69.0", "8.6.112.0"], real, ask: { _, ip in ip == "8.6.112.0" ? Probe.ok : Probe.noLink }), Probe.direct,
+                       "настоящий адрес после мёртвого — всё равно «напрямую»")
+        XCTAssertEqual(Probe.reach("claude.ai", [], real, ask: { _, _ in Probe.ok }), Probe.noLink, "адресов нет")
+        var count = 0
+        _ = Probe.reach("claude.ai", ["1.1.1.1", "2.2.2.2", "3.3.3.3", "4.4.4.4", "5.5.5.5", "6.6.6.6"], real, ask: { _, _ in count += 1; return Probe.noLink })
+        XCTAssertEqual(count, Probe.tries, "спрашиваем не больше tries узлов")
+    }
+
+    func testDirectIsNotGood() {
+        let direct = Array(repeating: Probe.direct, count: Probe.host.count)
+        XCTAssertEqual(Probe.good(direct), 0, "«напрямую» не считается открывшимся сайтом")
+        XCTAssertEqual(Probe.best([direct, res(1), nil], current: 0), 1, "сервис, который всё пропускает, проигрывает")
+        XCTAssertEqual(Set(Probe.control).count, 3, "сверка у трёх разных DNS")
+        XCTAssertFalse(Probe.control.contains { Services.setOf($0) != nil || Services.isStale($0) }, "сервисы программы в сверку не попали")
+    }
+
     func testClassify() {
         XCTAssertEqual(Probe.classify("200 "), Probe.ok)
         XCTAssertEqual(Probe.classify("302 https://www.google.com/sorry/index"), Probe.captcha)
@@ -57,16 +115,20 @@ final class LogicTests: XCTestCase {
         XCTAssertEqual(Probe.classify("302 https://x/Unsupported-Country"), Probe.blocked, "регистр не важен")
         XCTAssertEqual(Probe.classify("302 https://x/service-not-available"), Probe.blocked)
         XCTAssertEqual(Probe.classify("000 "), Probe.noLink)
+        XCTAssertEqual(Probe.classify(""), Probe.noLink, "curl ничего не вывел")
     }
 
     private func res(_ ok: Int) -> [String] { (0..<6).map { $0 < ok ? Probe.ok : Probe.noLink } }
 
     func testBest() {
-        XCTAssertEqual(Probe.best([res(5), res(4), res(6), nil], current: -1), 2, "больше сайтов")
-        XCTAssertEqual(Probe.best([res(3), res(5), res(5), nil], current: -1), 1, "при равенстве — раньше в списке")
-        XCTAssertEqual(Probe.best([res(5), res(3), res(5), nil], current: 2), 2, "при равенстве остаётся текущий")
-        XCTAssertEqual(Probe.best([res(0), res(0), res(0), nil], current: 1), 1, "ничего не открывается — остаётся текущий")
-        XCTAssertEqual(Probe.best([res(2), res(4), res(3), nil], current: Services.xboxSet), 1, "текущий Xbox не мешает")
+        // как в программе: GeoHide, MagicDNS и Xbox, который не проверяется (nil)
+        XCTAssertEqual(Probe.best([res(4), res(6), nil], current: -1), 1, "больше сайтов")
+        XCTAssertEqual(Probe.best([res(5), res(5), nil], current: -1), 0, "при равенстве — раньше в списке")
+        XCTAssertEqual(Probe.best([res(5), res(5), nil], current: 1), 1, "при равенстве остаётся текущий")
+        XCTAssertEqual(Probe.best([res(0), res(0), nil], current: 1), 1, "ничего не открывается — остаётся текущий")
+        XCTAssertNil([res(2), res(4), nil][Services.xboxSet], "в этом наборе Xbox — непроверенный")
+        XCTAssertEqual(Probe.best([res(2), res(4), nil], current: Services.xboxSet), 1, "текущий Xbox не мешает")
+        XCTAssertEqual(Probe.best([res(0), res(0), nil], current: Services.xboxSet), 0, "текущий Xbox и ничего не открывается — первый проверенный, не Xbox")
         XCTAssertEqual(Probe.best([nil, res(0), res(0)], current: -1), 1, "непроверенный первым не выбирается")
     }
 
@@ -74,7 +136,7 @@ final class LogicTests: XCTestCase {
 
     func testOutcome() {
         XCTAssertTrue(Model.reached(true, 2, 2))
-        XCTAssertFalse(Model.reached(true, 2, 0), "хотели MagicDNS, а встал Comss")
+        XCTAssertFalse(Model.reached(true, 2, 0), "хотели один сервис, а встал другой")
         XCTAssertTrue(Model.reached(false, 2, nil))
         XCTAssertNil(Model.outcome(true, done: true, err: nil))
         XCTAssertEqual(Model.outcome(false, done: true, err: "IPv6"), "DNS выключен, но: IPv6")
@@ -113,13 +175,13 @@ final class LogicTests: XCTestCase {
     private let flush = ["/usr/bin/dscacheutil -flushcache", "/usr/bin/killall -HUP mDNSResponder"]
 
     func testPlanWithoutIpv6() {
-        let p = Dns.plan(set: 2, services: [wifi4], off: [])
+        let p = Dns.plan(set: 1, services: [wifi4], off: [])
         XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 109.120.177.170 45.88.163.92"] + flush)
         XCTAssertEqual(p.off, [])
     }
 
     func testPlanTurnsIpv6OffAndRemembers() {
-        let p = Dns.plan(set: 2, services: [wifi6], off: [])
+        let p = Dns.plan(set: 1, services: [wifi6], off: [])
         XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 109.120.177.170 45.88.163.92", "\(ns) -setv6off \"Wi-Fi\""] + flush)
         XCTAssertEqual(p.off, ["Wi-Fi"])
     }
@@ -147,7 +209,7 @@ final class LogicTests: XCTestCase {
     func testPlanSwitchDoesNotTurnOffTwice() {
         let off = NetService(name: "Wi-Fi", ipv6Auto: false, hasGlobalIpv6: false)   // уже выключен программой
         let p = Dns.plan(set: 0, services: [off], off: ["Wi-Fi"])
-        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 94.250.253.55 212.109.195.93"] + flush)
+        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 143.20.64.192 5.175.161.40"] + flush)
         XCTAssertEqual(p.off, ["Wi-Fi"])
     }
 
