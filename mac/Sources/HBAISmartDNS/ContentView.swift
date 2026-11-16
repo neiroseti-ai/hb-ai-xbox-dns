@@ -205,6 +205,8 @@ struct ContentView: View {
                         .foregroundColor(k == m.dnsSet ? Palette.ink : Palette.soft)
                         .frame(maxWidth: .infinity).frame(height: 40)
                         .background(RoundedRectangle(cornerRadius: 12).fill(k == m.dnsSet ? Palette.yellow : .clear))
+                        // без этого невыбранный сервис нажимался только по самому слову: прозрачная заливка в кнопку не входит
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
             }

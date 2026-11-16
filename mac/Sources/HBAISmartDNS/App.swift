@@ -11,8 +11,10 @@ struct HBAISmartDNSApp: App {
         WindowGroup("HB AI · Smart DNS") {
             ContentView()
                 // Высота под 13-дюймовый MacBook: на экране 1440x900 под строкой меню и над Dock остаётся около 800.
-                // Содержимое занимает около 760 (статус в две строки), остальное — запас снизу.
-                .frame(width: 440, height: 780)
+                // Скрытый заголовок добавляет к высоте 28, поэтому здесь 752: окно выходит 440x780. Содержимое идёт
+                // от самого верха окна (ignoresSafeArea) и занимает 740 при статусе в одну строку, около 755 в две
+                // и 769 в три (замер 16.11.2026 на macOS 15 в GitHub Actions). До этой правки окно было 808.
+                .frame(width: 440, height: 752)
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)
