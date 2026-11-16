@@ -28,9 +28,12 @@ enum Fonts {
             CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
         }
     }
-    static func head(_ s: CGFloat) -> Font { .custom("Unbounded-ExtraBold", size: s) }
-    static func bold(_ s: CGFloat) -> Font { .custom("Manrope-Bold", size: s) }
-    static func med(_ s: CGFloat) -> Font { .custom("Manrope-Medium", size: s) }
+    // Имена — те, что записаны внутри файлов (PostScript), а не имена файлов: шрифты в res урезаны и переименованы.
+    // До 1.25 здесь стояли «Unbounded-ExtraBold» и «Manrope-…», таких шрифтов нет, и окно рисовалось системным.
+    static let names = ["HBUnbounded", "HBManropeBold", "HBManropeMedium"]
+    static func head(_ s: CGFloat) -> Font { .custom(names[0], size: s) }
+    static func bold(_ s: CGFloat) -> Font { .custom(names[1], size: s) }
+    static func med(_ s: CGFloat) -> Font { .custom(names[2], size: s) }
 }
 
 enum Palette {

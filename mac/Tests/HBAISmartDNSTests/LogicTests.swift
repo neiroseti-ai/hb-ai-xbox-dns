@@ -1,4 +1,5 @@
 import XCTest
+import CoreText
 @testable import HBAISmartDNS
 
 // Тесты чистой логики: систему не трогают (ни DNS, ни IPv6, ни пароля администратора).
@@ -65,6 +66,22 @@ final class LogicTests: XCTestCase {
         XCTAssertEqual(Set(Probe.host).count, Probe.host.count, "сайты не повторяются")
         XCTAssertEqual(Array(Probe.label.prefix(6)), ["ChatGPT", "Claude", "Gemini", "ElevenLabs", "Grok", "Perplexity"], "первые шесть — как раньше")
         XCTAssertEqual(Probe.host[site("Copilot")], "copilot.com", "Copilot проверяется по имени, куда переадресует copilot.microsoft.com")
+    }
+
+    // Шрифты окна: имя, которое просит программа, должно быть записано в файле. С 1.22 по 1.24 программа просила
+    // «Unbounded-ExtraBold» и «Manrope-…» (имена файлов), таких шрифтов нет, и окно рисовалось системным.
+    func testFontNamesMatchFiles() {
+        let res = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("res")
+        var found: [String] = []
+        for file in ["Unbounded-ExtraBold.ttf", "Manrope-Bold.ttf", "Manrope-Medium.ttf"] {
+            let list = CTFontManagerCreateFontDescriptorsFromURL(res.appendingPathComponent(file) as CFURL) as? [CTFontDescriptor] ?? []
+            XCTAssertEqual(list.count, 1, file)
+            for d in list {
+                if let name = CTFontDescriptorCopyAttribute(d, kCTFontNameAttribute) as? String { found.append(name) }
+            }
+        }
+        XCTAssertEqual(found, Fonts.names, "шрифт просят по имени из файла, иначе окно рисуется системным")
     }
 
     // ---------- проверка сайтов ----------
