@@ -29,10 +29,12 @@ namespace HbAi.XboxDns
         {
             DnsReplies();
             RealAddress();
+            SharedAddress();
             BestService();
             KnownAddresses();
             SiteAnswers();
             NewVersion();
+            WindowLayout();
             WindowDrag();
             Switching();
             AfterSwitch();
@@ -339,6 +341,164 @@ namespace HbAi.XboxDns
             });
         }
 
+        // ---------- вторая сверка: прокси сервиса — адрес, отданный на сайты разных владельцев ----------
+
+        static int Site(string label) { int k = Array.IndexOf(Probe.Label, label); if (k < 0) throw new Exception("нет сайта " + label); return k; }
+
+        // ответы сервиса: «сайт=адрес,адрес», про остальные сайты сервис молчит
+        static string[][] Answers(params string[] pairs)
+        {
+            var ips = new string[Probe.Host.Length][];
+            foreach (var p in pairs) ips[Site(p.Split('=')[0])] = p.Split('=')[1].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+            return ips;
+        }
+
+        static void SharedAddress()
+        {
+            T("У каждого сайта есть имя, подпись и владелец", () =>
+                Eq(true, Probe.Label.Length == Probe.Host.Length && Probe.Owner.Length == Probe.Host.Length));
+
+            T("Сайты и подписи в списке не повторяются", () =>
+                Eq(true, Probe.Host.Distinct().Count() == Probe.Host.Length && Probe.Label.Distinct().Count() == Probe.Label.Length));
+
+            T("Первые шесть сайтов — те же, что в прежних версиях", () =>
+                Eq("ChatGPT,Claude,Gemini,ElevenLabs,Grok,Perplexity", string.Join(",", Probe.Label.Take(6))));
+
+            T("Copilot проверяется по copilot.com, куда переадресует copilot.microsoft.com", () =>
+                Eq("copilot.com", Probe.Host[Site("Copilot")]));
+
+            T("Сайты Google записаны за одним владельцем, сайты OpenAI — за другим", () =>
+                Eq(true, new[] { "Gemini", "NotebookLM", "AI Studio" }.All(l => Probe.Owner[Site(l)] == "Google")
+                      && new[] { "ChatGPT", "Sora", "API OpenAI" }.All(l => Probe.Owner[Site(l)] == "OpenAI")
+                      && Probe.Owner[Site("Claude")] == Probe.Owner[Site("API Claude")] && Probe.Owner[Site("Claude")] != "OpenAI"));
+
+            T("Адрес, отданный на сайты двух владельцев, — прокси сервиса", () =>
+                Eq("179.236.130", string.Join(",", Probe.Shared(Answers("ChatGPT=179.236.130.10", "Claude=179.236.130.10")))));
+
+            T("Адрес, отданный только на сайты одного владельца, прокси не считается", () =>
+                Eq(0, Probe.Shared(Answers("Gemini=142.250.154.101", "NotebookLM=142.250.154.102", "AI Studio=142.250.154.113")).Count));
+
+            T("Разные адреса одной сети /24 на сайты разных владельцев — один прокси", () =>
+                Eq(1, Probe.Shared(Answers("ChatGPT=5.175.161.3", "Grok=5.175.161.40")).Count));
+
+            T("Прокси ищется по всем адресам ответа, а не только по первому", () =>
+                Eq(true, Probe.Shared(Answers("ChatGPT=1.1.1.1,5.175.161.3", "Grok=2.2.2.2,5.175.161.40")).Contains("5.175.161")));
+
+            T("Сервис ни на что не ответил — прокси нет", () => Eq(0, Probe.Shared(Answers()).Count));
+
+            var proxy = new HashSet<string> { "179.236.130" };
+            var google = new HashSet<string> { "142.251.1.100" };
+
+            T("Адрес не из прокси сервиса считается настоящим, даже если обычные DNS его не назвали", () =>
+                Eq(true, Probe.Known(google, new[] { "142.250.154.101" }, proxy).Contains("142.250.154.101")));
+
+            T("Адрес прокси настоящим не становится", () =>
+                Eq(false, Probe.Known(google, new[] { "179.236.130.10" }, proxy).Contains("179.236.130.10")));
+
+            T("Ответы обычных DNS остаются среди настоящих", () =>
+                Eq(true, Probe.Known(google, new[] { "179.236.130.10" }, proxy).Contains("142.251.1.100")));
+
+            T("Сервис про сайт промолчал — настоящие адреса только от обычных DNS", () =>
+                Eq(1, Probe.Known(google, null, proxy).Count));
+
+            Func<string, ICollection<string>> silent = h => new HashSet<string>();
+            Func<string, string, string> opens = (h, ip) => Probe.Ok;
+
+            T("Как Geodema 14.11.2026: AI Studio по настоящему адресу Google из незнакомой сети — «напрямую», ChatGPT через прокси — «открывается»", () =>
+            {
+                var res = Probe.Verdicts(Answers("ChatGPT=179.236.130.10", "Claude=179.236.130.10", "AI Studio=142.250.154.101"),
+                    h => h == "aistudio.google.com" ? (ICollection<string>)google : new HashSet<string>(), opens);
+                Eq(Probe.Direct, res[Site("AI Studio")], "AI Studio:");
+                Eq(Probe.Ok, res[Site("ChatGPT")], "ChatGPT:");
+                Eq(Probe.Ok, res[Site("Claude")], "Claude:");
+                Eq(Probe.NoDns, res[Site("Grok")], "Grok:");
+            });
+
+            T("Обычные DNS молчат, но адрес отдан только одному сайту — «напрямую», а не «открывается»", () =>
+                Eq(Probe.Direct, Probe.Verdicts(Answers("ChatGPT=179.236.130.10", "Claude=179.236.130.10", "Spotify=151.101.67.42"), silent, opens)[Site("Spotify")]));
+
+            T("Адрес Cloudflare, общий для сайтов разных владельцев, но названный обычными DNS, — «напрямую»", () =>
+            {
+                var res = Probe.Verdicts(Answers("ChatGPT=8.47.69.0", "Grok=8.47.69.0"), h => new HashSet<string> { "8.47.69.0" }, opens);
+                Eq(Probe.Direct, res[Site("ChatGPT")]); Eq(Probe.Direct, res[Site("Grok")]);
+            });
+
+            T("Общий адрес Cloudflare обычные DNS назвали только для одного из сайтов — «напрямую» оба: такая сеть не прокси", () =>
+            {
+                var res = Probe.Verdicts(Answers("ChatGPT=8.47.69.0", "Grok=8.47.69.0"),
+                    h => h == "grok.com" ? new HashSet<string> { "8.47.69.0" } : new HashSet<string>(), opens);
+                Eq(Probe.Direct, res[Site("ChatGPT")], "ChatGPT:"); Eq(Probe.Direct, res[Site("Grok")], "Grok:");
+            });
+
+            T("Сеть прокси, которую обычные DNS не называли, прокси и остаётся, даже если про другие сайты они ответили", () =>
+            {
+                var res = Probe.Verdicts(Answers("ChatGPT=5.175.161.40", "Grok=5.175.161.3", "Perplexity=104.18.26.48"),
+                    h => h == "www.perplexity.ai" ? new HashSet<string> { "104.18.26.48" } : new HashSet<string> { "8.47.69.0" }, opens);
+                Eq(Probe.Ok + "," + Probe.Ok + "," + Probe.Direct, res[Site("ChatGPT")] + "," + res[Site("Grok")] + "," + res[Site("Perplexity")]);
+            });
+
+            T("Настоящие адреса сайта, на который сервис не ответил или ответил 0.0.0.0, не спрашивают", () =>
+            {
+                var asked = new List<string>();
+                Probe.Verdicts(Answers("ChatGPT=5.175.161.40", "Grok=5.175.161.3", "Claude=0.0.0.0", "Gemini="),
+                    h => { lock (asked) asked.Add(h); return new HashSet<string>(); }, opens);
+                Eq("chatgpt.com,grok.com", string.Join(",", asked.OrderBy(x => x, StringComparer.Ordinal)));
+            });
+
+            T("Один и тот же адрес на три сайта Google и больше ни на чей — все три «напрямую»", () =>
+            {
+                var res = Probe.Verdicts(Answers("Gemini=142.250.154.101", "NotebookLM=142.250.154.101", "AI Studio=142.250.154.101"), silent, opens);
+                Eq(Probe.Direct + "," + Probe.Direct + "," + Probe.Direct, res[Site("Gemini")] + "," + res[Site("NotebookLM")] + "," + res[Site("AI Studio")]);
+            });
+
+            T("Итог идёт по сайтам в том же порядке, что список; сайт спрашивают по его имени и адресу от сервиса", () =>
+            {
+                var res = Probe.Verdicts(Answers("ChatGPT=1.1.1.1", "Claude=1.1.1.1", "Notion=1.1.1.9"), silent,
+                    (h, ip) => h == "www.notion.so" && ip == "1.1.1.9" ? Probe.Blocked : h == "claude.ai" ? Probe.Captcha : Probe.Ok);
+                Eq(Probe.Host.Length, res.Length);
+                Eq(Probe.Ok + "," + Probe.Captcha + "," + Probe.Blocked, res[Site("ChatGPT")] + "," + res[Site("Claude")] + "," + res[Site("Notion")]);
+            });
+
+            T("Сервис отвечает 0.0.0.0 на всё (как Xbox DNS) — «не пускает», на сайт не ходим", () =>
+                Eq(true, Probe.Verdicts(Enumerable.Repeat(new[] { "0.0.0.0" }, Probe.Host.Length).ToArray(), silent,
+                    (h, ip) => { throw new Exception("на сайт ходить не нужно"); }).All(r => r == Probe.Zero)));
+
+            T("Сбой при обращении к сайту доходит до вызвавшего, а не закрывает программу из потока", () =>
+                Eq("сайт сломался", Thrown(() => Probe.Reach("claude.ai", new[] { "1.1.1.1", "2.2.2.2" }, new HashSet<string>(), (h, ip) => { throw new Exception("сайт сломался"); }))));
+
+            T("Сбой при разборе одного сайта доходит до вызвавшего из общей проверки", () =>
+                Eq("сверка сломалась", Thrown(() => Probe.Verdicts(Answers("ChatGPT=1.1.1.1", "Claude=1.1.1.1"), h => { throw new Exception("сверка сломалась"); }, opens))));
+
+            T("Работы идут разом, а не по очереди, и каждая получает свой номер", () =>
+            {
+                var seen = new List<int>();
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                Probe.Together(6, n => { Thread.Sleep(150); lock (seen) seen.Add(n); });
+                Eq("0,1,2,3,4,5", string.Join(",", seen.OrderBy(x => x)));
+                Eq(true, sw.ElapsedMilliseconds < 600, "за " + sw.ElapsedMilliseconds + " мс:");
+            });
+
+            T("Настоящие адреса сайта спрашивают один раз, сколько бы сервисов о нём ни узнавало", () =>
+            {
+                int calls = 0;
+                var once = Probe.Once(h => { Interlocked.Increment(ref calls); Thread.Sleep(30); return new HashSet<string> { h }; });
+                var th = Enumerable.Range(0, 8).Select(i => new Thread(() => once(i % 2 == 0 ? "claude.ai" : "grok.com"))).ToArray();
+                foreach (var x in th) x.Start();
+                foreach (var x in th) x.Join();
+                Eq(2, calls, "запросов:");
+                Eq("claude.ai", once("claude.ai").Single());
+                Eq("grok.com", once("grok.com").Single());
+                Eq(2, calls, "после повторов:");
+            });
+        }
+
+        // текст исключения, которым кончилось действие; null — исключения не было
+        static string Thrown(Action a)
+        {
+            try { a(); return null; }
+            catch (Exception e) { return e.Message; }
+        }
+
         // ---------- «Найти лучший» ----------
 
         static string[] Res(int ok)
@@ -373,14 +533,86 @@ namespace HbAi.XboxDns
 
             T("Непроверенный сервис не выбирается, даже если стоит первым", () =>
                 Eq(1, Probe.Best(new[] { null, Res(0), Res(0) }, -1)));
+
+            T("Ни один сервис не проверен — текущий лучшим не называется", () =>
+                Eq(0, Probe.Best(new string[][] { null, null, null }, 2)));
+
+            T("DNS включён, лучший обогнал текущий на один сайт — остаёмся на текущем", () =>
+                Eq(0, Probe.Best(new[] { Res(11), Res(12), Res(10), Res(9), null }, 0, 2)));
+
+            T("DNS включён, лучший обогнал текущий на два сайта — переключаемся", () =>
+                Eq(1, Probe.Best(new[] { Res(11), Res(13), Res(10), Res(9), null }, 0, 2)));
+
+            T("DNS выключен — переключаемся и из-за одного сайта", () =>
+                Eq(1, Probe.Best(new[] { Res(11), Res(12), Res(10), Res(9), null }, 0, 1)));
+
+            T("Текущий не открывает ничего — уходим к тому, кто открыл хотя бы один сайт", () =>
+                Eq(2, Probe.Best(new[] { Res(0), Res(0), Res(1), Res(0), null }, 0, 2)));
+
+            T("Запас в один сайт не мешает остаться на текущем, когда он сам лучший", () =>
+                Eq(3, Probe.Best(new[] { Res(11), Res(12), Res(10), Res(12), null }, 3, 2)));
+
+            T("Среди обогнавших на два сайта выбирается самый лучший, а не первый попавшийся", () =>
+                Eq(2, Probe.Best(new[] { Res(9), Res(11), Res(13), Res(12), null }, 0, 2)));
+
+            var results = new[] { Res(11), Res(12), Res(10), Res(0), null };
+
+            T("Подпись: лучший сервис и сколько сайтов открылось из скольких", () =>
+                Eq("Лучший сейчас: MagicDNS (12 из " + Probe.Host.Length + ")", Probe.BestNote(results, 1, 1)));
+
+            T("Подпись: остались на текущем из-за разницы в один сайт — так и написано", () =>
+                Eq("Оставили GeoHide EU (11 из " + Probe.Host.Length + "): у MagicDNS всего на сайт больше", Probe.BestNote(results, 0, 1)));
+
+            T("Подпись: при равенстве остались на текущем — он и назван лучшим", () =>
+                Eq("Лучший сейчас: Перевал (12 из " + Probe.Host.Length + ")", Probe.BestNote(new[] { Res(11), Res(12), Res(12), null }, 2, 1)));
+
+            T("Подпись: не открывает ни один", () =>
+                Eq("Сейчас ни один сервис не открывает нейросети", Probe.BestNote(new[] { Res(0), Res(0), Res(0), Res(0), null }, 0, 0)));
+
+            T("Подпись «Оставили …» с любыми двумя сервисами помещается в две строки под статусом", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                    for (int a = 0; a < Dns.Count; a++)
+                        for (int b = 0; b < Dns.Count; b++)
+                        {
+                            var all = new string[Dns.Count][];
+                            all[a] = Res(Probe.Host.Length - 1); all[b] = Res(Probe.Host.Length);
+                            string note = Probe.BestNote(all, a, b);
+                            Eq(true, Lines(f, "fMed", 10.5f, note, f.ClientSize.Width - 60) <= 2, note + ":");
+                        }
+            });
+
+            T("Подписи сервисов под статусом помещаются в две строки", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                    for (int k = 0; k < Dns.Count; k++)
+                        Eq(true, Lines(f, "fMed", 10.5f, Dns.Name[k] + ": " + Dns.Opens[k], f.ClientSize.Width - 60) <= 2, Dns.Name[k] + ":");
+            });
         }
 
         // ---------- какой сервис стоит в Windows ----------
 
         static void KnownAddresses()
         {
-            T("Адрес MagicDNS узнаётся", () => Eq(1, Dns.SetOf("109.120.177.170")));
-            T("Второй адрес MagicDNS узнаётся", () => Eq(1, Dns.SetOf("45.88.163.92")));
+            T("Адрес MagicDNS узнаётся", () => Eq(1, Dns.SetOf("217.144.190.216")));
+            T("Второй адрес MagicDNS узнаётся", () => Eq(1, Dns.SetOf("109.120.187.249")));
+            T("Адреса MagicDNS из 1.23–1.24 за сервис не выдаются: сервис с них переехал", () =>
+                Eq(true, Dns.SetOf("109.120.177.170") == -1 && Dns.SetOf("45.88.163.92") == -1));
+            T("Адреса MagicDNS из 1.23–1.24 помечены как старые — программа предложит поставить рабочие", () =>
+                Eq(true, Dns.IsStale("109.120.177.170") && Dns.IsStale("45.88.163.92")));
+            T("Адрес «Перевала» узнаётся", () => Eq("Перевал", Dns.Name[Dns.SetOf("153.80.200.170")]));
+            T("Geodema и WebShift в программу не взяты (приложение к платному VPN): их адреса — не сервис и не «старые»", () =>
+                Eq(true, new[] { "179.236.130.10", "179.236.130.11", "31.31.207.68" }.All(a => Dns.SetOf(a) == -1 && !Dns.IsStale(a))));
+            T("Сервисов для нейросетей три, последним стоит Xbox DNS", () =>
+                Eq("GeoHide EU,MagicDNS,Перевал,Xbox DNS", string.Join(",", Dns.Name)));
+            T("Ни один адрес не принадлежит двум сервисам сразу", () =>
+                Eq(Dns.V4.Sum(a => a.Length), Dns.V4.SelectMany(a => a).Distinct().Count()));
+            T("Адрес каждого сервиса узнаётся как его собственный", () =>
+                Eq(true, Enumerable.Range(0, Dns.Count).All(k => Dns.V4[k].Length > 0 && Dns.V4[k].All(a => Dns.SetOf(a) == k))));
+            T("Рабочие адреса сервисов не помечены как старые", () =>
+                Eq(false, Dns.V4.SelectMany(a => a).Any(Dns.IsStale)));
             T("Адрес GeoHide узнаётся", () => Eq(0, Dns.SetOf("143.20.64.192")));
             T("Новый второй адрес GeoHide узнаётся", () => Eq(0, Dns.SetOf("5.175.161.40")));
             T("Старый адрес MagicDNS (до 04.11) не выдаётся за сервис", () => Eq(-1, Dns.SetOf("109.120.132.43")));
@@ -401,7 +633,9 @@ namespace HbAi.XboxDns
             T("Нерабочий адрес GeoHide из версии 1.1 не выдаётся за сервис", () => Eq(-1, Dns.SetOf("193.233.112.67")));
             T("Нерабочий адрес GeoHide из версии 1.1 помечен как старый", () => Eq(true, Dns.IsStale("193.233.112.67")));
             T("Адрес Astracat из версий 1.2–1.21 помечен как старый", () => Eq(true, Dns.IsStale("135.106.217.200")));
-            T("Рабочий адрес MagicDNS не старый", () => Eq(false, Dns.IsStale("109.120.177.170")));
+            T("Рабочий адрес MagicDNS не старый", () => Eq(false, Dns.IsStale("217.144.190.216")));
+            T("Свой IPv6 есть только у Xbox DNS: у остальных программа выключает IPv6 на время работы", () =>
+                Eq(true, Enumerable.Range(0, Dns.Count).All(k => (Dns.V6[k].Length > 0) == (k == Dns.XboxSet))));
             T("DNS роутера не старый", () => Eq(false, Dns.IsStale("192.168.1.1")));
             T("DNS роутера — не сервис", () => Eq(-1, Dns.SetOf("192.168.1.1")));
             T("Google 8.8.8.8 — не сервис", () => Eq(-1, Dns.SetOf("8.8.8.8")));
@@ -425,6 +659,51 @@ namespace HbAi.XboxDns
                 Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 302\r\nLocation: /service-not-available\r\n\r\n")));
             T("Адрес страницы блока заглавными буквами", () =>
                 Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 302\r\nLocation: /Unsupported-Country\r\n\r\n")));
+            T("Слово «unavailable» в тексте страницы — не отказ (так на copilot.com)", () =>
+                Eq(Probe.Ok, Probe.Classify("HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n<script>console.warn('Client Hints unavailable')</script>")));
+            T("Слова «unavailable» и «unsupported» в посторонних заголовках — не отказ", () =>
+                Eq(Probe.Ok, Probe.Classify("HTTP/1.1 200 OK\r\nX-Robots-Tag: unavailable_after: 2027\r\nPermissions-Policy: unsupported=()\r\n\r\n")));
+            T("Капча ищется в адресе переадресации, а не в постороннем заголовке", () =>
+                Eq(Probe.Ok, Probe.Classify("HTTP/1.1 200 OK\r\nLink: </sorry/help>; rel=help\r\n\r\n")));
+            T("Отказ Cloudflare по стране простым текстом «error code: 1009» (так он отвечает программе) — блок страны", () =>
+                Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 403 Forbidden\r\nContent-Type: text/plain; charset=UTF-8\r\nServer: cloudflare\r\n\r\nerror code: 1009")));
+            T("Пустой ответ: сервер закрыл соединение, ничего не сказав, — нет связи", () =>
+                Eq(Probe.NoLink, Probe.Classify("")));
+            T("Ответ не по HTTP — нет связи", () =>
+                Eq(Probe.NoLink, Probe.Classify("SSH-2.0-OpenSSH_9.6\r\n")));
+            T("Код 503 «Service Unavailable» — нет связи, а не блок страны: сайт или прокси не справился", () =>
+                Eq(Probe.NoLink, Probe.Classify("HTTP/1.1 503 Service Unavailable\r\nRetry-After: 5\r\n\r\n")));
+            T("Код 502 от прокси — нет связи", () =>
+                Eq(Probe.NoLink, Probe.Classify("HTTP/1.1 502 Bad Gateway\r\n\r\n<h1>502 Bad Gateway</h1>")));
+            T("Код 451 без пояснения в первой строке — блок страны", () =>
+                Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 451\r\n\r\n")));
+            T("Код 451 без пояснения, а за ним другие заголовки — блок страны (код берётся без хвоста строки)", () =>
+                Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 451\r\nServer: nginx\r\nContent-Length: 0\r\n\r\n")));
+            T("Слово «unavailable» в первой строке при коде 200 — не отказ", () =>
+                Eq(Probe.Ok, Probe.Classify("HTTP/1.1 200 Unavailable-Looking-Reason\r\n\r\n")));
+            T("Код 421 (так отвечает корень api.openai.com через прокси) — открывается", () =>
+                Eq(Probe.Ok, Probe.Classify("HTTP/1.1 421 Misdirected Request\r\n\r\n{\"message\":\"Welcome to the OpenAI API!\"}")));
+            T("Сертификат на имя сайта принимается, даже если цепочка не проверена", () =>
+                Eq(true, Probe.NameFits(System.Net.Security.SslPolicyErrors.None) && Probe.NameFits(System.Net.Security.SslPolicyErrors.RemoteCertificateChainErrors)));
+            T("Сертификат на чужое имя — заглушка сервиса, а не сайт: не принимается", () =>
+                Eq(false, Probe.NameFits(System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch)
+                       || Probe.NameFits(System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch | System.Net.Security.SslPolicyErrors.RemoteCertificateChainErrors)));
+            T("Страница Cloudflare «…to restrict access» — блок страны", () =>
+                Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 403 Forbidden\r\nServer: cloudflare\r\n\r\n<title>Access denied | grok.com used Cloudflare to restrict access</title>")));
+            T("Ответ OpenAI unsupported_country_region_territory в теле — блок страны", () =>
+                Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 403 Forbidden\r\n\r\n{\"error\":{\"code\":\"unsupported_country_region_territory\"}}")));
+            T("Страница «This service is not available in your region» — блок страны", () =>
+                Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 403 Forbidden\r\n\r\nThis service is not available in your region.")));
+            T("Страница «…not available in your country» — блок страны", () =>
+                Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 200 OK\r\n\r\n<h1>Sorry, this app is Not Available In Your Country</h1>")));
+            T("Код 451 «Unavailable For Legal Reasons» в первой строке — блок страны", () =>
+                Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 451 Unavailable For Legal Reasons\r\n\r\n")));
+            T("Ответ 403 без слов о стране через прокси — открывается (так отвечает Claude до входа)", () =>
+                Eq(Probe.Ok, Probe.Classify("HTTP/1.1 403 Forbidden\r\nCf-Mitigated: challenge\r\n\r\n<title>Just a moment...</title>")));
+            T("Ответ оборван на заголовках — судим по тому, что пришло", () =>
+                Eq(Probe.Blocked, Probe.Classify("HTTP/1.1 302 Found\r\nLocation: https://geo-restriction.elevenlabs.io/")));
+            T("Заголовок Location не первый и не последний — находится", () =>
+                Eq(Probe.Captcha, Probe.Classify("HTTP/1.1 302 Found\r\nDate: x\r\nLocation: https://www.google.com/sorry/index\r\nServer: gws\r\n\r\n")));
         }
 
         // ---------- новая версия ----------
@@ -447,17 +726,199 @@ namespace HbAi.XboxDns
             {
                 MainForm.ForceScale = 1f;
                 using (var f = new MainForm())
-                using (var plain = new Bitmap(440, 852))
-                using (var upd = new Bitmap(440, 852))
+                using (var plain = Draw(f))
                 {
-                    f.DrawToBitmap(plain, new Rectangle(0, 0, 440, 852));
-                    typeof(MainForm).GetField("update", BindingFlags.NonPublic | BindingFlags.Instance).SetValue(f, "1.23");
-                    f.DrawToBitmap(upd, new Rectangle(0, 0, 440, 852));
-                    // середина кнопки: была фиолетовой, стала жёлтой
-                    Eq(true, plain.GetPixel(60, 750).B > 200, "до:");
-                    Eq(true, upd.GetPixel(60, 750).R > 200 && upd.GetPixel(60, 750).B < 150, "после:");
+                    Field(f, "update", "1.23");
+                    using (var upd = Draw(f))
+                    {
+                        // левый край кнопки: был фиолетовым, стал жёлтым
+                        var vk = (Rectangle)Field(f, "rVk");
+                        int x = vk.X + 32, y = vk.Y + vk.Height / 2;
+                        Eq(true, plain.GetPixel(x, y).B > 200, "до:");
+                        Eq(true, upd.GetPixel(x, y).R > 200 && upd.GetPixel(x, y).B < 150, "после:");
+                    }
                 }
             });
+        }
+
+        // ---------- окно: разметка ----------
+
+        const BindingFlags Inside = BindingFlags.NonPublic | BindingFlags.Instance;
+        static object Field(MainForm f, string name) { return typeof(MainForm).GetField(name, Inside).GetValue(f); }
+        static void Field(MainForm f, string name, object value) { typeof(MainForm).GetField(name, Inside).SetValue(f, value); }
+
+        // Снимок рисуется без окна (MainForm.Snapshot): Windows не даёт окну стать выше экрана, и на экране
+        // высотой 768 низ снимка оставался бы пустым.
+        static Bitmap Draw(MainForm f) { return f.Snapshot(); }
+
+        // размер текста шрифтом окна: family — поле окна со шрифтом (fMed, fBold), pt — размер, как в Pt
+        static X Measured<X>(MainForm f, string family, float pt, Func<Graphics, Font, X> measure)
+        {
+            using (var bmp = new Bitmap(10, 10))
+            using (var g = Graphics.FromImage(bmp))
+            using (var font = new Font((FontFamily)Field(f, family), pt * 96f / 72f, GraphicsUnit.Pixel))
+                return measure(g, font);
+        }
+
+        static float TextWidth(MainForm f, string family, float pt, string text)
+        {
+            return Measured(f, family, pt, (g, font) => g.MeasureString(text, font).Width);
+        }
+
+        // во сколько строк ляжет текст в полосе шириной width
+        static int Lines(MainForm f, string family, float pt, string text, float width)
+        {
+            return Measured(f, family, pt, (g, font) =>
+            {
+                int chars, lines;
+                using (var sf = new StringFormat()) g.MeasureString(text, font, new SizeF(width, 1000), sf, out chars, out lines);
+                return lines;
+            });
+        }
+
+        static int Layout(string name)
+        {
+            var field = typeof(MainForm).GetField(name, BindingFlags.NonPublic | BindingFlags.Static);
+            return (int)(field.IsLiteral ? field.GetRawConstantValue() : field.GetValue(null));
+        }
+
+        static int WordAt(int col)
+        {
+            return (int)typeof(MainForm).GetMethod("WordAt", BindingFlags.NonPublic | BindingFlags.Static).Invoke(null, new object[] { col });
+        }
+
+        // сколько зелёных точек результата стоит в столбце x: точка — сплошной зелёный отрезок не короче пяти пикселей
+        static int GreenDots(Bitmap bmp, int x)
+        {
+            int dots = 0, run = 0;
+            for (int y = 0; y < bmp.Height; y++)
+            {
+                var c = bmp.GetPixel(x, y);
+                bool green = c.G > 170 && c.R < 120 && c.B < 160;
+                run = green ? run + 1 : 0;
+                if (run == 5) dots++;
+            }
+            return dots;
+        }
+
+        static void WindowLayout()
+        {
+            T("В окне видны результаты по всем сайтам: две колонки, ни одна строка не ушла за край и не слилась с соседней", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                {
+                    int set = (int)Field(f, "dnsSet");
+                    Field(f, "check", Enumerable.Repeat(Probe.Ok, Probe.Host.Length).ToArray());
+                    Field(f, "checkSet", set);
+                    using (var bmp = Draw(f))
+                    {
+                        int left = GreenDots(bmp, 50), right = GreenDots(bmp, 220);   // середины точек первой и второй колонки
+                        Eq(Probe.Host.Length, left + right, "точек:");
+                        Eq(true, left - right == 0 || left - right == 1, "колонки " + left + " и " + right + ":");
+                    }
+                }
+            });
+
+            T("Снимок окна — в полный рост, какой бы ни был экран: 440 на высоту разметки", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                using (var bmp = Draw(f))
+                {
+                    Eq(new Size(Layout("LW"), Layout("LH")), bmp.Size);
+                    var vk = (Rectangle)Field(f, "rVk");
+                    Eq(true, vk.Bottom < bmp.Height && bmp.GetPixel(vk.X + 32, vk.Bottom - 6).A == 255, "низ окна нарисован:");
+                }
+            });
+
+            T("Пока проверки не было, зелёных точек нет", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                using (var bmp = Draw(f))
+                    Eq(0, GreenDots(bmp, 50) + GreenDots(bmp, 220));
+            });
+
+            T("Результат проверки другого сервиса в карточке выбранного не показывается", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                {
+                    int set = (int)Field(f, "dnsSet");
+                    Field(f, "check", Enumerable.Repeat(Probe.Ok, Probe.Host.Length).ToArray());
+                    Field(f, "checkSet", (set + 1) % Dns.Count);
+                    using (var bmp = Draw(f)) Eq(0, GreenDots(bmp, 50) + GreenDots(bmp, 220));
+                }
+            });
+
+            T("Кнопки всех сервисов помещаются в окно и не перекрываются", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                {
+                    var seg = (Rectangle[])Field(f, "rSeg");
+                    Eq(Dns.Count, seg.Length);
+                    Eq(true, seg[0].Left >= 0 && seg[seg.Length - 1].Right <= f.ClientSize.Width, "края:");
+                    Eq(true, Enumerable.Range(1, seg.Length - 1).All(k => seg[k].Left >= seg[k - 1].Right), "соседи:");
+                }
+            });
+
+            T("Короткие имена сервисов помещаются в свои кнопки", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                {
+                    var seg = (Rectangle[])Field(f, "rSeg");
+                    for (int k = 0; k < Dns.Count; k++)
+                        Eq(true, TextWidth(f, "fBold", 8.5f, Dns.Short[k]) <= seg[k].Width - 8, Dns.Short[k] + ":");
+                }
+            });
+
+            T("Подпись сайта не налезает на слово-результат рядом с ней", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                    for (int i = 0; i < Probe.Host.Length; i++)
+                        Eq(true, Layout("LabelAt") + TextWidth(f, "fMed", 9.5f, Probe.Label[i]) <= WordAt(i / Layout("Rows")) + 2, Probe.Label[i] + ":");
+            });
+
+            T("Самое длинное слово-результат не выходит из своей колонки", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                {
+                    float widest = new[] { Probe.Ok, Probe.Blocked, Probe.Captcha, Probe.NoLink, Probe.NoDns, Probe.Zero, Probe.Direct }
+                        .Max(w => TextWidth(f, "fBold", 8f, w));
+                    int inner = f.ClientSize.Width - 56 - 36;   // карточка без полей
+                    Eq(true, WordAt(0) + widest <= Layout("ColW") + 2, "первая колонка:");
+                    Eq(true, WordAt(1) + widest <= inner - Layout("ColW") + 2, "вторая колонка:");
+                }
+            });
+
+            T("Плашка с версией и сайтом сервиса не доходит до кнопки «свернуть»", () =>
+            {
+                MainForm.ForceScale = 1f;
+                using (var f = new MainForm())
+                    for (int k = 0; k < Dns.Count; k++)
+                        Eq(true, 30 + TextWidth(f, "fBold", 11f, "Smart DNS " + MainForm.Version + " · " + Dns.Site[k]) + 46 <= ((Rectangle)Field(f, "rMin")).X - 6, Dns.Site[k] + ":");
+            });
+
+            T("Версия в окне и в манифесте программы одна", () =>
+            {
+                string manifest = File.ReadAllText(Path.Combine(Root(), "app.manifest"));
+                var v = MainForm.Version.Split('.');   // 1.25 → 1.2.5.0, 1.3 → 1.3.0.0
+                string third = v[1].Length > 1 ? v[1].Substring(1) : "0";
+                Eq(true, manifest.Contains("version=\"" + v[0] + "." + v[1][0] + "." + third + ".0\""), "манифест:");
+                Eq(true, File.ReadLines(Path.Combine(Root(), "XboxDns.cs")).First().Contains("Smart DNS " + MainForm.Version + " "), "первая строка кода:");
+            });
+        }
+
+        // папка программы: тесты запускают из неё (test.bat) или из любой другой, указав её в HBDNS_ROOT
+        static string Root()
+        {
+            string env = Environment.GetEnvironmentVariable("HBDNS_ROOT");
+            return string.IsNullOrEmpty(env) ? Directory.GetCurrentDirectory() : env;
         }
 
         // ---------- окно: перетаскивание ----------
@@ -474,7 +935,7 @@ namespace HbAi.XboxDns
                     var seg = ((Rectangle[])typeof(MainForm).GetField("rSeg", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(f))[set];
                     // нажатие на уже выбранный сервис ничего не включает и DNS не трогает
                     Mouse(f, "OnMouseDown", new Point(seg.X + seg.Width / 2, seg.Y + seg.Height / 2));
-                    Mouse(f, "OnMouseMove", new Point(220, 470));   // свободное место под статусом
+                    Mouse(f, "OnMouseMove", new Point(220, seg.Y - 30));   // свободное место: подпись под статусом
                     Eq(new Point(300, 200), f.Location, "окно:");
                 }
             });
@@ -487,10 +948,10 @@ namespace HbAi.XboxDns
                     f.Location = new Point(300, 200);
                     int set = (int)typeof(MainForm).GetField("dnsSet", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(f);
                     var seg = ((Rectangle[])typeof(MainForm).GetField("rSeg", BindingFlags.NonPublic | BindingFlags.Instance).GetValue(f))[set];
-                    Mouse(f, "OnMouseDown", new Point(220, 470));   // тянули с пустого места, отпускание не дошло
+                    Mouse(f, "OnMouseDown", new Point(220, seg.Y - 30));   // тянули с пустого места, отпускание не дошло
                     Mouse(f, "OnMouseDown", new Point(seg.X + seg.Width / 2, seg.Y + seg.Height / 2));
                     var before = f.Location;
-                    Mouse(f, "OnMouseMove", new Point(250, 480));
+                    Mouse(f, "OnMouseMove", new Point(250, seg.Y - 20));
                     Eq(before, f.Location, "окно:");
                 }
             });
@@ -501,8 +962,9 @@ namespace HbAi.XboxDns
                 using (var f = new MainForm())
                 {
                     f.Location = new Point(300, 200);
-                    Mouse(f, "OnMouseDown", new Point(220, 470));
-                    Mouse(f, "OnMouseMove", new Point(250, 480));
+                    int free = ((Rectangle[])Field(f, "rSeg"))[0].Y - 30;   // подпись под статусом
+                    Mouse(f, "OnMouseDown", new Point(220, free));
+                    Mouse(f, "OnMouseMove", new Point(250, free + 10));
                     Eq(new Point(330, 210), f.Location, "окно:");
                 }
             });
@@ -582,7 +1044,7 @@ namespace HbAi.XboxDns
                 .Invoke(null, new object[] { net, f, new Dns.Errors() });
         }
         const int Magic = 1;
-        const string MagicDns = "dns6 10 reset; dns 10 109.120.177.170,45.88.163.92";
+        const string MagicDns = "dns6 10 reset; dns 10 217.144.190.216,109.120.187.249";
 
         static void Switching()
         {
@@ -622,6 +1084,15 @@ namespace HbAi.XboxDns
                 Eq("dns 10 reset; dns6 10 reset", net.Take());
             });
 
+            T("«Перевал» с одним адресом ставит один DNS, второй от прежнего сервиса не остаётся", () =>
+            {
+                var net = new FakeNet { Has6 = false }; net.Plug("Wi-Fi"); string f = ListFile();
+                int pereval = Dns.SetOf("153.80.200.170");
+                Dns.Enable(Magic, net, f); net.Take();
+                Eq(null, Dns.Enable(pereval, net, f));
+                Eq("dns6 10 reset; dns 10 153.80.200.170", net.Take());
+            });
+
             T("Xbox DNS со своими IPv6-адресами возвращает IPv6", () =>
             {
                 var net = new FakeNet("Wi-Fi"); string f = ListFile();
@@ -635,7 +1106,7 @@ namespace HbAi.XboxDns
                 var net = new FakeNet("Wi-Fi", "Ethernet"); string f = ListFile();
                 net.V6On["{Ethernet}"] = false;
                 Dns.Enable(Magic, net, f);
-                Eq("dns6 10 reset; dns 10 109.120.177.170,45.88.163.92; v6off Wi-Fi; dns 11 109.120.177.170,45.88.163.92", net.Take());
+                Eq("dns6 10 reset; dns 10 217.144.190.216,109.120.187.249; v6off Wi-Fi; dns 11 217.144.190.216,109.120.187.249", net.Take());
                 Dns.Disable(net, f);
                 Eq("dns 10 reset; dns 11 reset; v6on Wi-Fi", net.Take());
             });
@@ -668,7 +1139,7 @@ namespace HbAi.XboxDns
                 var net = new FakeNet("Wi-Fi", "Ethernet"); string f = ListFile();
                 net.Refuse.Add("Wi-Fi");
                 Eq("IPv6 не выключился на «Wi-Fi»: нет доступа", Dns.Enable(Magic, net, f));
-                Eq("dns6 10 reset; dns 10 109.120.177.170,45.88.163.92; dns6 11 reset; dns 11 109.120.177.170,45.88.163.92; v6off Ethernet", net.Take());
+                Eq("dns6 10 reset; dns 10 217.144.190.216,109.120.187.249; dns6 11 reset; dns 11 217.144.190.216,109.120.187.249; v6off Ethernet", net.Take());
             });
 
             T("Имя подключения с квадратными скобками и кириллицей", () =>

@@ -1,4 +1,5 @@
-// HB AI · Smart DNS 1.24 для macOS — те же сервисы, та же проверка и то же уведомление о новой версии, что в версии для Windows.
+// HB AI · Smart DNS 1.25 для macOS — те же сервисы, такая же проверка (текст страницы не читается, см. Probe.classify)
+// и то же уведомление о новой версии, что в версии для Windows.
 import SwiftUI
 import CoreText
 
@@ -9,7 +10,9 @@ struct HBAISmartDNSApp: App {
     var body: some Scene {
         WindowGroup("HB AI · Smart DNS") {
             ContentView()
-                .frame(width: 440, height: 820)
+                // Высота под 13-дюймовый MacBook: на экране 1440x900 под строкой меню и над Dock остаётся около 800.
+                // Содержимое занимает около 760 (статус в две строки), остальное — запас снизу.
+                .frame(width: 440, height: 780)
         }
         .windowStyle(.hiddenTitleBar)
         .windowResizability(.contentSize)

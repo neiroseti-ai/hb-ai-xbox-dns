@@ -77,26 +77,32 @@ final class Model: ObservableObject {
         guard !checking else { return }
         checking = true; checkSet = -2; check = nil; bestNote = nil
         let current = dnsSet
+        let wasActive = active
         DispatchQueue.global().async {
             var all = [[String]?](repeating: nil, count: Services.count)
             let lock = NSLock(); let group = DispatchGroup()
+            let memo = Probe.Memo { Probe.real($0) }   // настоящие адреса сайта — один раз на все сервисы
             for s in 0..<Services.count where s != Services.xboxSet {   // Xbox DNS нейросети не открывает
                 group.enter()
                 DispatchQueue.global().async {
-                    let r = Probe.service(s)
+                    let r = Probe.service(s, real: { memo.get($0) })
                     lock.lock(); all[s] = r; lock.unlock()
                     group.leave()
                 }
             }
             group.wait()
-            let best = Probe.best(all, current: current)
-            let good = Probe.good(all[best])
+            let top = Probe.best(all, current: -1)
             DispatchQueue.main.async {
-                self.checking = false; self.check = all[best]; self.checkSet = best
-                let note = good == 0 ? "Сейчас ни один сервис не открывает нейросети"
-                    : "Лучший сейчас: \(Services.name[best]) (\(good) из \(Probe.host.count))"
-                // ничего не открывается, идёт переключение или человек уже выбрал другой сервис — DNS не трогаем
-                if good > 0 && !self.busy && self.dnsSet == current && best != self.dnsSet {
+                // Пока шёл поиск, человек мог сменить сервис, включить или выключить DNS. Тогда DNS не трогаем,
+                // в карточке оставляем выбранный сервис и просто называем лучший.
+                let moved = self.busy || self.dnsSet != current || self.active != wasActive
+                // включённый сервис из-за одного сайта не меняем: см. Probe.best
+                let best = moved ? top : Probe.best(all, current: current, margin: self.active ? 2 : 1)
+                let show = moved ? self.dnsSet : best
+                self.checking = false; self.check = all[show]; self.checkSet = show
+                let note = Probe.bestNote(all, best: best, top: top)
+                // если не открывает ни один — DNS не трогаем
+                if !moved && Probe.good(all[best]) > 0 && best != self.dnsSet {
                     self.dnsSet = best
                     if self.active { self.apply(true, note: note); return }
                 }
@@ -117,13 +123,13 @@ struct ContentView: View {
             RadialGradient(colors: [Color(red: 60 / 255, green: 140 / 255, blue: 255 / 255).opacity(0.22), .clear], center: .init(x: 0.0, y: 0.75), startRadius: 0, endRadius: 280)
             VStack(alignment: .leading, spacing: 0) {
                 pill.padding(.top, 34)
-                title.padding(.top, 20)
-                toggle.padding(.top, 22).frame(maxWidth: .infinity)
-                status.padding(.top, 18).frame(maxWidth: .infinity)
-                segments.padding(.top, 20)
-                card.padding(.top, 16)
-                vkButton.padding(.top, 16)
-                footer.padding(.top, 18)
+                title.padding(.top, 14)
+                toggle.padding(.top, 14).frame(maxWidth: .infinity)
+                status.padding(.top, 12).frame(maxWidth: .infinity)
+                segments.padding(.top, 14)
+                card.padding(.top, 12)
+                vkButton.padding(.top, 12)
+                footer.padding(.top, 12)
                 Spacer(minLength: 0)
             }
             .padding(.horizontal, 28)
@@ -163,17 +169,17 @@ struct ContentView: View {
                     .shadow(color: (m.active ? Palette.yellow : Palette.violet).opacity(m.active || m.busy ? (pulse ? 0.55 : 0.25) : 0), radius: 34)
                 if m.busy {
                     Circle().trim(from: 0, to: 0.25).stroke(Palette.violet, style: StrokeStyle(lineWidth: 5, lineCap: .round))
-                        .frame(width: 180, height: 180)
+                        .frame(width: 134, height: 134)
                         .rotationEffect(.degrees(pulse ? 360 : 0))
                         .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: pulse)
                 }
-                VStack(spacing: 10) {
-                    Image(systemName: "power").font(.system(size: 54, weight: .bold))
+                VStack(spacing: 6) {
+                    Image(systemName: "power").font(.system(size: 40, weight: .bold))
                         .foregroundColor(m.active ? Palette.ink : .white)
-                    Text(m.active ? "ВКЛ" : "ВЫКЛ").font(Fonts.head(13)).foregroundColor(m.active ? Palette.ink : Palette.soft)
+                    Text(m.active ? "ВКЛ" : "ВЫКЛ").font(Fonts.head(10)).foregroundColor(m.active ? Palette.ink : Palette.soft)
                 }
             }
-            .frame(width: 200, height: 200)
+            .frame(width: 150, height: 150)
         }
         .buttonStyle(.plain)
         .disabled(m.busy)
@@ -195,9 +201,9 @@ struct ContentView: View {
         HStack(spacing: 0) {
             ForEach(0..<Services.count, id: \.self) { k in
                 Button { m.pick(k) } label: {
-                    Text(Services.short[k]).font(Fonts.bold(9.5))
+                    Text(Services.short[k]).font(Fonts.bold(9)).lineLimit(1)
                         .foregroundColor(k == m.dnsSet ? Palette.ink : Palette.soft)
-                        .frame(maxWidth: .infinity).frame(height: 46)
+                        .frame(maxWidth: .infinity).frame(height: 40)
                         .background(RoundedRectangle(cornerRadius: 12).fill(k == m.dnsSet ? Palette.yellow : .clear))
                 }
                 .buttonStyle(.plain)
@@ -210,7 +216,7 @@ struct ContentView: View {
 
     // карточка проверки: адреса, кнопки и что открывается через выбранный сервис
     var card: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 10) {
                 Text("DNS").font(Fonts.bold(9.5)).foregroundColor(Palette.violet)
                 Text(Services.v4[m.dnsSet].joined(separator: "  /  ")).font(Fonts.med(10)).foregroundColor(Palette.text)
@@ -220,25 +226,37 @@ struct ContentView: View {
                 Spacer()
                 small(m.checking && m.checkSet == -2 ? "Ищем…" : "Найти лучший") { m.runBest() }
             }
-            let forThis = m.check != nil && m.checkSet == m.dnsSet
-            LazyVGrid(columns: [GridItem(.flexible(), alignment: .leading), GridItem(.flexible(), alignment: .leading)], spacing: 6) {
-                ForEach(order, id: \.self) { i in
-                    let r: String? = forThis ? m.check![i] : nil
-                    HStack(spacing: 6) {
-                        Circle().fill(dot(r)).frame(width: 9, height: 9)
-                        Text(Probe.label[i]).font(Fonts.med(9.5)).foregroundColor(Palette.text).frame(width: 72, alignment: .leading)
-                        if let r = r { Text(r).font(Fonts.bold(8)).foregroundColor(dot(r)) }
+            // результаты по сайтам: две колонки, как в версии для Windows; под второй — сколько открывается
+            let shown: [String]? = m.checkSet == m.dnsSet ? m.check : nil
+            HStack(alignment: .top, spacing: 0) {
+                ForEach(0..<2, id: \.self) { col in
+                    VStack(alignment: .leading, spacing: 5) {
+                        ForEach(Probe.column(col), id: \.self) { i in
+                            row(i, shown.map { $0[i] })
+                        }
+                        if col == 1, let res = shown {
+                            Text("Открывается \(Probe.good(res)) из \(res.count)").font(Fonts.bold(8)).foregroundColor(Palette.soft)
+                                .frame(height: 13)
+                        }
                     }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
-        .padding(18)
+        .padding(14)
         .background(RoundedRectangle(cornerRadius: 16).fill(Palette.card))
         .overlay(RoundedRectangle(cornerRadius: 16).stroke(Palette.line))
     }
 
-    // порядок, при котором сетка 2×3 идёт колонками, как в версии для Windows
-    private var order: [Int] { [0, 3, 1, 4, 2, 5] }
+    // строка результата: точка, сайт и слово; высота задана, чтобы колонки стояли ровно и карточка не меняла рост
+    private func row(_ i: Int, _ r: String?) -> some View {
+        HStack(spacing: 6) {
+            Circle().fill(dot(r)).frame(width: 9, height: 9)
+            Text(Probe.label[i]).font(Fonts.med(9.5)).foregroundColor(Palette.text).lineLimit(1).frame(width: 72, alignment: .leading)
+            if let r = r { Text(r).font(Fonts.bold(8)).foregroundColor(dot(r)).lineLimit(1) }
+        }
+        .frame(height: 13)
+    }
 
     private func dot(_ r: String?) -> Color {
         guard let r = r else { return Color(red: 70 / 255, green: 70 / 255, blue: 88 / 255) }
@@ -264,7 +282,7 @@ struct ContentView: View {
         Button { open(m.update != nil ? Updates.page : "https://vk.com/neiroseti_ai") } label: {
             Text(m.update.map { "Скачать версию \($0)  →" } ?? "Наша группа ВКонтакте  →").font(Fonts.head(11.5))
                 .foregroundColor(m.update != nil ? Palette.ink : .white)
-                .frame(maxWidth: .infinity).frame(height: 56)
+                .frame(maxWidth: .infinity).frame(height: 46)
                 .background(RoundedRectangle(cornerRadius: 16).fill(m.update != nil
                     ? AnyShapeStyle(Palette.yellow)
                     : AnyShapeStyle(LinearGradient(colors: [Color(red: 124 / 255, green: 92 / 255, blue: 1), Color(red: 76 / 255, green: 124 / 255, blue: 1)], startPoint: .leading, endPoint: .trailing))))

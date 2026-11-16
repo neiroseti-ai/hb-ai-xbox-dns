@@ -1,6 +1,7 @@
-// HB AI · Smart DNS 1.24 — переключатель Smart DNS (GeoHide EU, MagicDNS, xbox-dns.ru) со встроенной проверкой и уведомлением о новой версии.
+// HB AI · Smart DNS 1.25 — переключатель Smart DNS (GeoHide EU, MagicDNS, «Перевал», xbox-dns.ru) со встроенной проверкой и уведомлением о новой версии.
 // Сборка: build.bat (csc из .NET Framework 4, есть в каждой Windows 10/11). DNS и IPv6 меняются через CIM, без PowerShell.
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Drawing.Drawing2D;
@@ -19,42 +20,56 @@ namespace HbAi.XboxDns
 {
     static class Dns
     {
-        // Сервисы Smart DNS. Проверено 14.11.2026 из России (МГТС, Москва), tools/probe_dns.py:
-        // GeoHide Европа открывает ChatGPT, Claude, ElevenLabs и Grok, но на каждый сайт отдаёт семь адресов своих
-        // узлов, и три из них не отвечали совсем (143.20.64.192, 37.221.93.128, 45.13.237.213), а четвёртый
-        // (31.25.239.132) — для части сайтов; Gemini — капча,
-        // Perplexity пропускает напрямую. MagicDNS (с 04.11.2026 на 109.120.177.170 и 45.88.163.92)
-        // 14.11.2026 не отвечал; 06.11.2026 открывал ChatGPT, ElevenLabs, Grok.
+        // Сервисы Smart DNS. Проверено 14.11.2026 из России (МГТС, Москва) по 15 сайтам из Probe.Host,
+        // tools/probe_dns.py и tools/probe_chain.py. Сколько открывает каждый, меняется от проверки к проверке.
+        // GeoHide Европа: ChatGPT, Claude, ElevenLabs, Grok и ещё восемь; Gemini — капча или нет связи, Perplexity
+        // и Copilot не подменяет. На каждый сайт отдаёт семь адресов своих узлов, и три из них не отвечали совсем
+        // (143.20.64.192, 37.221.93.128, 45.13.237.213), а четвёртый (31.25.239.132) — для части сайтов.
+        // MagicDNS после переезда 04.11.2026 сменил адреса ещё раз: 14.11.2026 на magicdns.ru стоят 217.144.190.216
+        // и 109.120.187.249, а адреса из 1.23–1.24 (109.120.177.170, 45.88.163.92) 06.11.2026 отвечали, с 14.11.2026
+        // молчат. На новых открывает почти всё; Gemini 14.11.2026 днём — через раз, вечером и ночью — без капчи.
+        // «Перевал» (pereval.top), добавлен в 1.25: ChatGPT, Claude, Grok, Copilot и ещё шесть; ElevenLabs, Perplexity,
+        // Notion и Spotify не подменяет. Gemini вечером 14.11.2026 открывался без капчи, 15.11.2026 в 01:22 — капча
+        // шесть раз из шести. Адрес у него один: замолчит — сайты перестанут открываться, пока DNS не выключить
+        // или не выбрать другой сервис.
+        // Ни один из трёх не открывает сайты, заблокированные в России: 14.11.2026 одиннадцать таких сайтов
+        // через каждого — «нет связи».
+        // Geodema (179.236.130.10, 179.236.130.11) и WebShift (31.31.207.68) работают, но в программу не взяты:
+        // оба — бесплатное приложение к платному VPN того же оператора, и страница сервиса его рекламирует.
+        // Geodema 14.11.2026 открывал 9 сайтов из 15 и сайты Google не подменял.
         // Comss.one убран в 1.24: к 14.11.2026 он стал отдавать настоящие адреса нейросетей, без подмены — на его
         // странице «ИИ-сервисы (ChatGPT, Claude, Gemini) через Comss.one DNS больше не работают», Claude видит Россию.
         // Astracat (135.106.217.200, 85.209.2.112) не отвечает — убран в 1.22.
         // Российские узлы GeoHide (159.194.200.33, 193.233.112.x) отвечают, но их прокси из России не открываются.
         // xbox-dns.ru с 10.10.2026 на нейросети отвечает 0.0.0.0, оставлен только для Xbox Live.
-        public static readonly string[] Name = { "GeoHide EU", "MagicDNS", "Xbox DNS" };
-        public static readonly string[] Short = { "GeoHide", "MagicDNS", "Xbox" };
+        public static readonly string[] Name = { "GeoHide EU", "MagicDNS", "Перевал", "Xbox DNS" };
+        public static readonly string[] Short = { "GeoHide", "MagicDNS", "Перевал", "Xbox" };
         public static readonly string[][] V4 = {
             new[] { "143.20.64.192", "5.175.161.40" },
-            new[] { "109.120.177.170", "45.88.163.92" },
+            new[] { "217.144.190.216", "109.120.187.249" },
+            new[] { "153.80.200.170" },
             new[] { "111.88.96.54", "111.88.96.55" } };
         public static readonly string[][] V6 = {
-            new string[0], new string[0],
+            new string[0], new string[0], new string[0],
             new[] { "2a00:ab00:1233:26::50", "2a00:ab00:1233:26::51" } };
         // Что сервис открывает, меняется за дни, поэтому подпись отсылает к кнопке «Проверить».
         public static readonly string[] Opens = {
-            "ChatGPT, Claude, ElevenLabs, Grok; Gemini — капча. Точнее — «Проверить»",
-            "ChatGPT, ElevenLabs, Grok — когда отвечает. Сначала «Проверить»",
+            "ChatGPT, Claude, ElevenLabs, Grok и другие; Gemini — нет. Точнее — «Проверить»",
+            "почти весь список; Gemini — когда как. Точнее — «Проверить»",
+            "ChatGPT, Claude, Grok, Copilot; Gemini — когда как, ElevenLabs — нет. Точнее — «Проверить»",
             "только Xbox Live, нейросети — нет" };
-        public static readonly string[] Site = { "geohide.ru", "magicdns.ru", "xbox-dns.ru" };
-        public static readonly string[] Url = { "https://geohide.ru/", "https://magicdns.ru/", "https://xbox-dns.ru/" };
+        public static readonly string[] Site = { "geohide.ru", "magicdns.ru", "pereval.top", "xbox-dns.ru" };
+        public static readonly string[] Url = { "https://geohide.ru/", "https://magicdns.ru/", "https://pereval.top/", "https://xbox-dns.ru/" };
         public static int Count { get { return Name.Length; } }
-        public const int XboxSet = 2;
+        public const int XboxSet = 3;
         // Адреса из прежних версий. Старый xbox-dns.ru (1.0) — тот же сервис для Xbox.
         // Российский узел GeoHide (1.1), Astracat (1.2–1.21) и Comss.one (1.1–1.23) из России нейросети не открывают:
         // если они стоят, программа не выдаёт их за рабочий сервис, а предлагает нажать кнопку и поставить рабочие адреса.
         static readonly string[] XboxOld = { "111.88.96.50", "111.88.96.51" };
         static readonly string[] Stale = { "159.194.200.33", "193.233.112.67", "135.106.217.200", "85.209.2.112",
             "109.120.132.43", "94.249.177.102", "45.13.237.213",    // MagicDNS до 04.11.2026 и второй GeoHide из 1.22 — молчат с 06.11.2026
-            "94.250.253.55", "212.109.195.93", "83.220.169.155" };   // Comss.one: с 14.11.2026 адреса нейросетей не подменяет
+            "94.250.253.55", "212.109.195.93", "83.220.169.155",    // Comss.one: с 14.11.2026 адреса нейросетей не подменяет
+            "109.120.177.170", "45.88.163.92" };                    // MagicDNS из 1.23–1.24: молчат с 14.11.2026, сервис переехал
 
         // -1 — DNS сервиса не стоит, иначе номер набора (IPv4 определяет набор)
         public static int ActiveSet()
@@ -285,10 +300,22 @@ namespace HbAi.XboxDns
     // Адрес от сервиса сверяем с тем, что отвечают обычные DNS (Control). Совпал — сервис этот сайт не подменяет,
     // и человек попадает на него напрямую, как без программы. Так было с Comss.one в ноябре 2026: адреса настоящие,
     // ChatGPT отвечал 403 без слов о стране, и версия 1.23 писала «открывается».
+    // Вторая сверка (Shared, с 1.25): прокси — только адрес, который сервис отдал на сайты разных владельцев.
     static class Probe
     {
-        public static readonly string[] Host = { "chatgpt.com", "claude.ai", "gemini.google.com", "elevenlabs.io", "grok.com", "www.perplexity.ai" };
-        public static readonly string[] Label = { "ChatGPT", "Claude", "Gemini", "ElevenLabs", "Grok", "Perplexity" };
+        // Сайты для проверки. Первые шесть — как в прежних версиях, остальные добавлены в 1.25: 14.11.2026 каждый
+        // из них напрямую из России отказывал по стране (сразу или после входа) либо не отвечал, а через сервисы
+        // открывался. Copilot проверяется по copilot.com: туда переадресует copilot.microsoft.com, а GeoHide
+        // подменял только первое имя — после переадресации человек оказывался на сайте напрямую.
+        // Mistral в список не взят: из России он открывается и без сервиса.
+        public static readonly string[] Host = { "chatgpt.com", "claude.ai", "gemini.google.com", "elevenlabs.io", "grok.com", "www.perplexity.ai",
+            "copilot.com", "sora.chatgpt.com", "notebooklm.google.com", "aistudio.google.com", "api.anthropic.com", "api.openai.com",
+            "openrouter.ai", "www.notion.so", "open.spotify.com" };
+        public static readonly string[] Label = { "ChatGPT", "Claude", "Gemini", "ElevenLabs", "Grok", "Perplexity",
+            "Copilot", "Sora", "NotebookLM", "AI Studio", "API Claude", "API OpenAI", "OpenRouter", "Notion", "Spotify" };
+        // Чей сайт: по владельцам Shared отличает прокси сервиса от настоящего адреса.
+        public static readonly string[] Owner = { "OpenAI", "Anthropic", "Google", "ElevenLabs", "xAI", "Perplexity",
+            "Microsoft", "OpenAI", "Google", "Google", "Anthropic", "OpenAI", "OpenRouter", "Notion", "Spotify" };
         public const string Ok = "открывается", Blocked = "блок страны", Captcha = "капча Google", NoLink = "нет связи", NoDns = "DNS молчит", Zero = "не пускает", Direct = "напрямую";
 
         // Обычные DNS для сверки. Яндекс и Google отвечают как для России, Quad9 — как для заграницы: у Cloudflare
@@ -298,9 +325,11 @@ namespace HbAi.XboxDns
         // Первый адрес IPv4, который отдал сервер. "" — сервер ответил, но адреса нет; null — не ответил.
         public static string Resolve(string server, string host)
         {
-            var all = ResolveAll(server, host);
-            return all == null ? null : all.Length == 0 ? "" : all[0];
+            return First(ResolveAll(server, host));
         }
+
+        // первый адрес ответа: "" — ответ без адресов, null — ответа нет
+        internal static string First(string[] ips) { return ips == null ? null : ips.Length == 0 ? "" : ips[0]; }
 
         // Все адреса IPv4 из ответа сервера, по порядку. Пусто — адреса нет (NXDOMAIN или пустой ответ);
         // null — сервер не ответил, отказал или ответ не наш (тогда пробуем второй адрес сервиса).
@@ -385,13 +414,11 @@ namespace HbAi.XboxDns
         public static System.Collections.Generic.HashSet<string> Real(string host)
         {
             var real = new System.Collections.Generic.HashSet<string>();
-            var th = Control.Select(srv => new Thread(() =>
+            Together(Control.Length, n =>
             {
-                var ips = ResolveAll(srv, host);
+                var ips = ResolveAll(Control[n], host);
                 if (ips != null) lock (real) foreach (var ip in ips) real.Add(ip);
-            }) { IsBackground = true }).ToArray();
-            foreach (var x in th) x.Start();
-            foreach (var x in th) x.Join();
+            });
             return real;
         }
 
@@ -415,6 +442,47 @@ namespace HbAi.XboxDns
 
         // первые три числа адреса IPv4
         internal static string Net24(string ip) { int dot = ip.LastIndexOf('.'); return dot < 0 ? ip : ip.Substring(0, dot); }
+
+        // Сети /24, которые сервис отдал на сайты хотя бы двух разных владельцев (ips[k] — ответ про Host[k]).
+        // Так выглядит его прокси. Одной сверки с обычными DNS мало: у Google адресов тысячи, и 14.11.2026 сервис
+        // Geodema, который сайты Google не подменяет, отдал для AI Studio 142.250.154.101 — настоящий адрес из сети,
+        // которую обычные DNS не назвали. Версия 1.24 приняла бы его за прокси и написала «открывается».
+        // Общими бывают и настоящие адреса: у Cloudflare для России одни и те же 8.47.69.0 и 8.6.112.0 на ChatGPT,
+        // Grok, Perplexity и OpenRouter. Поэтому Verdicts убирает отсюда сети, которые назвали обычные DNS.
+        internal static HashSet<string> Shared(string[][] ips)
+        {
+            var owners = new Dictionary<string, HashSet<string>>();
+            for (int k = 0; k < ips.Length; k++)
+                foreach (var ip in ips[k] ?? new string[0])
+                {
+                    HashSet<string> o;
+                    if (!owners.TryGetValue(Net24(ip), out o)) owners[Net24(ip)] = o = new HashSet<string>();
+                    o.Add(Owner[k]);
+                }
+            return new HashSet<string>(owners.Where(p => p.Value.Count > 1).Select(p => p.Key));
+        }
+
+        // Что считать настоящими адресами сайта: ответы обычных DNS и те адреса от сервиса (ips), чьих сетей нет
+        // среди его прокси (shared). Через настоящий адрес человек идёт на сайт напрямую.
+        internal static ICollection<string> Known(ICollection<string> real, string[] ips, ICollection<string> shared)
+        {
+            var known = new HashSet<string>(real);
+            foreach (var ip in ips ?? new string[0]) if (!shared.Contains(Net24(ip))) known.Add(ip);
+            return known;
+        }
+
+        // Настоящие адреса сайта узнаём один раз, сколько бы сервисов о нём ни спросили: «Найти лучший» проверяет
+        // все сервисы разом, и иначе обычным DNS уходило бы по три запроса на каждый сайт каждого сервиса.
+        internal static Func<string, ICollection<string>> Once(Func<string, ICollection<string>> real)
+        {
+            var seen = new Dictionary<string, Lazy<ICollection<string>>>();
+            return host =>
+            {
+                Lazy<ICollection<string>> v;
+                lock (seen) if (!seen.TryGetValue(host, out v)) seen[host] = v = new Lazy<ICollection<string>>(() => real(host));
+                return v.Value;
+            };
+        }
 
         // Имя в DNS — метки, которые кончаются нулём или ссылкой (два байта 11xxxxxx) на имя выше в пакете.
         // Ссылка может стоять и после нескольких меток (например, «www» + ссылка на «example.com»).
@@ -440,7 +508,7 @@ namespace HbAi.XboxDns
                     if (!ar.AsyncWaitHandle.WaitOne(6000) || !tcp.Connected) return NoLink;
                     tcp.EndConnect(ar);
                     tcp.ReceiveTimeout = 8000; tcp.SendTimeout = 8000;
-                    using (var ssl = new System.Net.Security.SslStream(tcp.GetStream(), false, (s, c, ch, e) => true))
+                    using (var ssl = new System.Net.Security.SslStream(tcp.GetStream(), false, (s, c, ch, e) => NameFits(e)))
                     {
                         ssl.AuthenticateAsClient(host, null, (System.Security.Authentication.SslProtocols)(3072 | 12288), false);
                         var req = Encoding.ASCII.GetBytes("GET / HTTP/1.1\r\nHost: " + host +
@@ -457,33 +525,93 @@ namespace HbAi.XboxDns
             catch { return NoLink; }
         }
 
-        // что видит человек по заголовкам ответа сайта: капча Google, страница «недоступно в вашей стране» или сайт
-        public static string Classify(string head)
+        // Сертификат должен быть выписан на имя сайта. Прокси Smart DNS пересылает соединение как есть, и сертификат
+        // приходит от самого сайта (15.11.2026 так было у всех сервисов программы). Сертификат на другое имя — это
+        // страница-заглушка сервиса, а не сайт: связи с сайтом нет. Сертификат на чужое имя так же отвергает curl
+        // в версии для Mac. Цепочку доверия здесь не проверяем (антивирус с проверкой HTTPS подставляет свою),
+        // а curl проверяет: это второе, кроме текста страницы, отличие проверки на Mac.
+        internal static bool NameFits(System.Net.Security.SslPolicyErrors errors)
         {
-            head = head.ToLowerInvariant();
-            if (head.Contains("/sorry/")) return Captcha;
-            if (new[] { "restrict", "unsupported", "unavailable", "not-available" }.Any(head.Contains)) return Blocked;
+            return (errors & System.Net.Security.SslPolicyErrors.RemoteCertificateNameMismatch) == 0;
+        }
+
+        // Что видит человек по ответу сайта: капча Google, страница «недоступно в вашей стране», сайт или ничего.
+        // answer — заголовки и то начало страницы, что пришло вместе с ними.
+        // Код 5xx или пустой ответ — сайт или прокси не справился, страна ни при чём: «нет связи».
+        // Отказ по стране ищем по коду 451 и по одному слову в адресе переадресации. В остальных заголовках и в тексте
+        // страницы такие слова встречаются сами по себе (на copilot.com 14.11.2026 в коде страницы было
+        // «Client Hints unavailable»), поэтому в тексте страницы ищем только целые фразы отказа.
+        public static string Classify(string answer)
+        {
+            answer = answer.ToLowerInvariant();
+            if (!answer.StartsWith("http/", StringComparison.Ordinal)) return NoLink;
+            int end = answer.IndexOf("\r\n\r\n", StringComparison.Ordinal);
+            var lines = (end < 0 ? answer : answer.Substring(0, end)).Split('\n');
+            string code = (lines[0].Split(' ').Skip(1).FirstOrDefault() ?? "").Trim();
+            string to = lines.FirstOrDefault(l => l.StartsWith("location:", StringComparison.Ordinal)) ?? "";
+            if (code.StartsWith("5", StringComparison.Ordinal)) return NoLink;
+            if (to.Contains("/sorry/")) return Captcha;
+            if (code == "451" || new[] { "restrict", "unsupported", "unavailable", "not-available" }.Any(to.Contains)) return Blocked;
+            if (end >= 0 && PageRefusal.Any(answer.Substring(end).Contains)) return Blocked;
             return Ok;
         }
 
+        // Фразы отказа по стране в тексте страницы. Cloudflare на запрос программы отвечает простым текстом
+        // «error code: 1009» (страна закрыта владельцем сайта), а на запрос с Accept-Encoding — страницей
+        // «…used Cloudflare to restrict access». Остальные — OpenAI и xAI.
+        static readonly string[] PageRefusal = { "error code: 1009", "restrict access", "unsupported_country", "not available in your region", "not available in your country" };
+
         // результат по каждому сайту для набора DNS
-        public static string[] Service(int set)
+        public static string[] Service(int set) { return Service(set, Real); }
+
+        // real — где взять настоящие адреса сайта: в программе Real или он же через Once
+        internal static string[] Service(int set, Func<string, ICollection<string>> real)
         {
-            var res = new string[Host.Length];
-            var th = new Thread[Host.Length];
-            for (int i = 0; i < Host.Length; i++)
+            var ips = Each(k =>
             {
-                int k = i;
-                th[k] = new Thread(() =>
-                {
-                    string[] ips = null;
-                    foreach (var srv in Dns.V4[set]) { ips = ResolveAll(srv, Host[k]); if (ips != null) break; }
-                    res[k] = Judge(Host[k], ips, Real, Site);
-                });
-                th[k].IsBackground = true; th[k].Start();
-            }
-            foreach (var x in th) x.Join();
+                string[] a = null;
+                foreach (var srv in Dns.V4[set]) { a = ResolveAll(srv, Host[k]); if (a != null) break; }
+                return a;
+            });
+            return Verdicts(ips, real, Site);
+        }
+
+        // Итог по всем сайтам из ответов DNS сервиса: ips[k] — адреса для Host[k], null — сервис не ответил.
+        // Сначала по всем ответам сразу видно, какие сети — прокси сервиса: общие для сайтов разных владельцев
+        // (Shared), кроме тех, что обычные DNS назвали хоть для одного сайта, на который сервис дал адрес.
+        // Потом судим каждый сайт.
+        internal static string[] Verdicts(string[][] ips, Func<string, ICollection<string>> real, Func<string, string, string> ask)
+        {
+            var once = Once(real);   // настоящие адреса нужны дважды: здесь и когда судим сайт
+            var proxy = Shared(ips);
+            if (proxy.Count > 0)
+                foreach (var found in Each(k => Verdict(First(ips[k])) == null ? once(Host[k]) : null))
+                    foreach (var ip in found ?? new string[0]) proxy.Remove(Net24(ip));
+            return Each(k => Judge(Host[k], ips[k], h => Known(once(h), ips[k], proxy), ask));
+        }
+
+        // одно и то же по каждому сайту, все сайты разом
+        static X[] Each<X>(Func<int, X> work)
+        {
+            var res = new X[Host.Length];
+            Together(Host.Length, k => res[k] = work(k));
             return res;
+        }
+
+        // Сделать work(0) … work(count - 1) разом, каждое в своём потоке, и дождаться всех. Что упало в потоке,
+        // отдаём вызвавшему: необработанное исключение в потоке закрывает всю программу, а прогон тестов обрывает
+        // на полуслове.
+        internal static void Together(int count, Action<int> work)
+        {
+            Exception failed = null;
+            var th = Enumerable.Range(0, count).Select(n => new Thread(() =>
+            {
+                try { work(n); }
+                catch (Exception e) { failed = e; }
+            }) { IsBackground = true }).ToArray();
+            foreach (var x in th) x.Start();
+            foreach (var x in th) x.Join();
+            if (failed != null) throw new Exception(failed.Message, failed);
         }
 
         // Сервис отдаёт сразу несколько адресов своих узлов, в случайном порядке, и часть узлов бывает мёртвой:
@@ -496,16 +624,14 @@ namespace HbAi.XboxDns
         // настоящие адреса сайта, ask — как спросить сайт по адресу. В программе это Real и Site, в тестах — подставные.
         internal static string Judge(string host, string[] ips, Func<string, System.Collections.Generic.ICollection<string>> real, Func<string, string, string> ask)
         {
-            return Verdict(ips == null ? null : ips.Length == 0 ? "" : ips[0]) ?? Reach(host, ips, real(host), ask);
+            return Verdict(First(ips)) ?? Reach(host, ips, real(host), ask);
         }
 
         internal static string Reach(string host, string[] ips, System.Collections.Generic.ICollection<string> real, Func<string, string, string> ask)
         {
             var take = ips.Take(Tries).ToArray();
             var site = new string[take.Length];
-            var th = take.Select((ip, n) => new Thread(() => site[n] = ask(host, ip)) { IsBackground = true }).ToArray();
-            foreach (var x in th) x.Start();
-            foreach (var x in th) x.Join();
+            Together(take.Length, n => site[n] = ask(host, take[n]));
             return Pick(take, site, real);
         }
 
@@ -526,20 +652,35 @@ namespace HbAi.XboxDns
 
         public static int Good(string[] res) { return res == null ? -1 : res.Count(x => x == Ok); }
 
-        // сервис, где открылось больше всего сайтов; при равенстве остаётся текущий, чтобы не переключать DNS
-        // впустую, а без текущего среди проверенных — тот, что раньше в списке.
+        // Сервис, где открылось больше всего сайтов; при равенстве — тот, что раньше в списке.
+        // Текущий остаётся, если его никто не обогнал: чтобы не переключать DNS впустую. При margin 2 (DNS уже
+        // включён) он остаётся и тогда, когда лучший обогнал его всего на один сайт, а сам он что-то открывает:
+        // такая разница меняется от проверки к проверке, а смена сервиса меняет страну, из которой человека
+        // видят сайты, — за частую смену страны аккаунты блокируют.
         // Непроверенный сервис (null), например Xbox DNS, выбран не будет.
-        public static int Best(string[][] all, int current)
+        public static int Best(string[][] all, int current, int margin = 1)
         {
-            int best = current >= 0 && current < all.Length && all[current] != null ? current : 0;
-            for (int k = 0; k < all.Length; k++) if (Good(all[k]) > Good(all[best])) best = k;
-            return best;
+            int top = 0;
+            for (int k = 0; k < all.Length; k++) if (Good(all[k]) > Good(all[top])) top = k;
+            if (current < 0 || current >= all.Length || all[current] == null) return top;
+            int lead = Good(all[top]) - Good(all[current]);
+            return lead <= 0 || lead < margin && Good(all[current]) > 0 ? current : top;
+        }
+
+        // Что написать после «Найти лучший»: best — на ком остановились, top — у кого открылось больше всего.
+        internal static string BestNote(string[][] all, int best, int top)
+        {
+            int good = Good(all[best]), most = Good(all[top]);
+            if (most <= 0) return "Сейчас ни один сервис не открывает нейросети";
+            string count = " (" + good + " из " + Host.Length + ")";
+            return good == most ? "Лучший сейчас: " + Dns.Name[best] + count
+                : "Оставили " + Dns.Name[best] + count + ": у " + Dns.Name[top] + " всего на сайт больше";
         }
     }
 
     class MainForm : Form
     {
-        internal const string Version = "1.24";   // та же версия в app.manifest (1.2.4.0) и в первой строке файла
+        internal const string Version = "1.25";   // та же версия в app.manifest (1.2.5.0) и в первой строке файла
         static readonly Color Bg = Color.FromArgb(7, 7, 11);
         static readonly Color Violet = Color.FromArgb(140, 112, 255);
         static readonly Color Yellow = Color.FromArgb(255, 224, 102);
@@ -567,8 +708,13 @@ namespace HbAi.XboxDns
         string[] check; int checkSet = -1; bool checking; string bestNote;
         // окно тянется, только если кнопку мыши нажали на пустом месте
         Point dragFrom; bool dragging;
-        // Разметка в «логических» пикселях окна 440×852 (как при 100 %), на экран всё умножается на S = DPI / 96.
-        const int LW = 440, LH = 852;
+        // Разметка в «логических» пикселях окна (как при 100 %), на экран всё умножается на S = DPI / 96.
+        // Сверху вниз: кнопка, статус с подписью, выбор сервиса, карточка проверки, кнопка группы, подвал.
+        // Результаты проверки стоят в две колонки по Rows строк; последняя ячейка второй колонки — итог.
+        const int LW = 440, ToggleY = 186, ToggleD = 170, StatusY = ToggleY + ToggleD + 20, SetsY = StatusY + 80, SetsH = 48,
+            CardY = SetsY + SetsH + 14, RowH = 20, ColW = 170;
+        static readonly int Rows = Probe.Host.Length / 2 + 1, CardH = 82 + Rows * RowH + 10,
+            VkY = CardY + CardH + 14, FootY = VkY + 50 + 14, LH = FootY + 40;
         float S = 1f;
         internal static float ForceScale;
         readonly System.Windows.Forms.Timer anim = new System.Windows.Forms.Timer();
@@ -586,7 +732,7 @@ namespace HbAi.XboxDns
 
             rClose = new Rectangle(LW - 58, 22, 36, 36);
             rMin = new Rectangle(LW - 100, 22, 36, 36);
-            rToggle = new Rectangle((LW - 200) / 2, 196, 200, 200);
+            rToggle = new Rectangle((LW - ToggleD) / 2, ToggleY, ToggleD, ToggleD);
 
             anim.Interval = 30;
             anim.Tick += (s, e) => { pulse = (pulse + 0.035f) % 1f; if (busy || active) Invalidate(ToScreen(rToggleGlow())); };
@@ -601,7 +747,7 @@ namespace HbAi.XboxDns
             if (ForceScale <= 0)
                 ThreadPool.QueueUserWorkItem(_ => { string v = Updates.Newer(Version); if (v != null) Ui(() => { update = v; Invalidate(); }); });
             int segW = (LW - 56) / Dns.Count;
-            for (int k = 0; k < Dns.Count; k++) rSeg[k] = new Rectangle(28 + k * segW, 500, segW, 56);
+            for (int k = 0; k < Dns.Count; k++) rSeg[k] = new Rectangle(28 + k * segW, SetsY, segW, SetsH);
             MouseDown += OnDown;
             MouseMove += OnMove;
             MouseUp += (s, e) => dragging = false;
@@ -624,7 +770,7 @@ namespace HbAi.XboxDns
         }
 
         // Размер окна под масштаб: окно целиком должно влезать в рабочую область экрана
-        // (на ноутбуке 1080p при 150 % высота 852 × 1,5 больше экрана — тогда окно уменьшается целиком).
+        // (на ноутбуке 1080p при 150 % высота окна × 1,5 больше экрана — тогда окно уменьшается целиком).
         void ApplyScale(float scale, Rectangle wa)
         {
             S = ForceScale > 0 ? ForceScale : Math.Min(scale, Math.Min((wa.Height - 24f) / LH, (wa.Width - 24f) / LW));
@@ -731,6 +877,19 @@ namespace HbAi.XboxDns
             { g.FillPath(b, path); g.DrawPath(pen, path); }
         }
 
+        // Снимок окна без самого окна, для --shot и тестов. Windows не даёт окну стать выше экрана, и DrawToBitmap
+        // на невысоком экране оставлял низ снимка пустым.
+        internal Bitmap Snapshot()
+        {
+            var bmp = new Bitmap((int)Math.Round(LW * S), (int)Math.Round(LH * S));
+            using (var g = Graphics.FromImage(bmp))
+            {
+                g.Clear(BackColor);
+                using (var e = new PaintEventArgs(g, new Rectangle(Point.Empty, bmp.Size))) OnPaint(e);
+            }
+            return bmp;
+        }
+
         // плашка с сайтом сервиса, крестик, «свернуть» и заголовок
         void DrawTop(Graphics g)
         {
@@ -770,10 +929,10 @@ namespace HbAi.XboxDns
             string status = busy ? "Применяем настройки…" : active ? "DNS включён" : stale ? "Стоят старые адреса DNS" : "DNS выключен";
             using (var f = Pt(fHead, 15f))
             using (var b = new SolidBrush(active && !busy ? Yellow : Color.White))
-                Centered(g, status, f, b, 420);
+                Centered(g, status, f, b, StatusY);
             using (var f = Pt(fMed, 10.5f))
             using (var b = new SolidBrush(error != null ? Bad : Muted))
-                Centered(g, StatusNote(), f, b, 454, LW - 60);
+                Centered(g, StatusNote(), f, b, StatusY + 34, LW - 60);
         }
 
         string StatusNote()
@@ -788,7 +947,7 @@ namespace HbAi.XboxDns
         // выбор сервиса
         void DrawSets(Graphics g)
         {
-            Panel(g, new RectangleF(28, 500, LW - 56, 56), 16, CardBg, CardLine);
+            Panel(g, new RectangleF(28, SetsY, LW - 56, SetsH), 16, CardBg, CardLine);
             for (int k = 0; k < Dns.Count; k++)
             {
                 var sr = new RectangleF(rSeg[k].X + 4, rSeg[k].Y + 5, rSeg[k].Width - 8, rSeg[k].Height - 10);
@@ -805,7 +964,7 @@ namespace HbAi.XboxDns
         // карточка проверки: адреса, кнопки и что открывается через выбранный сервис
         void DrawCheck(Graphics g)
         {
-            var card = new RectangleF(28, 574, LW - 56, 150);
+            var card = new RectangleF(28, CardY, LW - 56, CardH);
             Panel(g, card, 16, CardBg, CardLine);
             using (var fl = Pt(fBold, 9.5f))
             using (var fv = Pt(fMed, 10f))
@@ -819,23 +978,36 @@ namespace HbAi.XboxDns
             rBest = new Rectangle((int)card.Right - 18 - 160, (int)card.Y + 40, 160, 30);
             DrawSmall(g, rCheck, checking && checkSet == dnsSet ? "Проверяем…" : "Проверить " + Dns.Short[dnsSet], !checking);
             DrawSmall(g, rBest, checking && checkSet == -2 ? "Ищем…" : "Найти лучший", !checking);
-            // результаты по сайтам: две колонки по три строки
+            // результаты по сайтам: две колонки по Rows строк, в последней ячейке — сколько открывается
             bool forThis = check != null && checkSet == dnsSet;
             using (var fn = Pt(fMed, 9.5f))
             using (var fs = Pt(fBold, 8f))
             {
-                for (int i = 0; i < Probe.Host.Length; i++)
+                for (int i = 0; i <= Probe.Host.Length; i++)
                 {
-                    float x = card.X + 18 + (i / 3) * ((card.Width - 36) / 2), y = card.Y + 82 + (i % 3) * 22;
+                    int col = i / Rows;
+                    float x = card.X + 18 + col * ColW, y = card.Y + 82 + (i % Rows) * RowH;
+                    if (i == Probe.Host.Length)
+                    {
+                        if (forThis)
+                            using (var b = new SolidBrush(Soft))
+                                g.DrawString("Открывается " + Probe.Good(check) + " из " + check.Length, fs, b, x, y + 2);
+                        break;
+                    }
                     string r = forThis ? check[i] : null;
                     using (var b = new SolidBrush(r == null ? Color.FromArgb(70, 70, 88) : ResultColor(r, BadDot))) g.FillEllipse(b, x, y + 4, 9, 9);
-                    using (var b = new SolidBrush(Light)) g.DrawString(Probe.Label[i], fn, b, x + 16, y);
+                    using (var b = new SolidBrush(Light)) g.DrawString(Probe.Label[i], fn, b, x + LabelAt, y);
                     if (r != null)
                         using (var b = new SolidBrush(ResultColor(r, Bad)))
-                            g.DrawString(r, fs, b, x + 92, y + 2);
+                            g.DrawString(r, fs, b, x + WordAt(col), y + 2);
                 }
             }
         }
+
+        // Где в строке результата стоят подпись сайта и слово-результат, от левого края колонки.
+        // Вторая колонка шире первой (ColW), и слово в ней стоит дальше: там самая длинная подпись, NotebookLM.
+        const int LabelAt = 14;
+        static int WordAt(int col) { return col == 0 ? 92 : 100; }
 
         // «напрямую» — серым: сервис этот сайт не трогает, это не успех и не поломка
         static Color ResultColor(string r, Color bad) { return r == Probe.Ok ? OkGreen : r == Probe.Captcha ? Yellow : r == Probe.Direct ? Muted : bad; }
@@ -843,7 +1015,7 @@ namespace HbAi.XboxDns
         // кнопка группы ВКонтакте (или «Скачать версию …», если вышла новая) и подвал
         void DrawFooter(Graphics g)
         {
-            rVk = new Rectangle(28, 742, LW - 56, 56);
+            rVk = new Rectangle(28, VkY, LW - 56, 50);
             using (var path = RoundPath(rVk, 16))
                 if (update != null)
                     using (var b = new SolidBrush(Yellow)) g.FillPath(b, path);
@@ -855,15 +1027,15 @@ namespace HbAi.XboxDns
                 g.DrawString(update != null ? "Скачать версию " + update + "  →" : "Наша группа ВКонтакте  →", f, b, rVk, Center);
             using (var fb = Pt(fHead, 13f))
             using (var bb = new SolidBrush(Violet))
-                g.DrawString("HB AI", fb, bb, 28, 812);
+                g.DrawString("HB AI", fb, bb, 28, FootY);
             using (var f = Pt(fMed, 9.5f))
             using (var b = new SolidBrush(Muted))
             {
                 var t = "vk.com/neiroseti_ai";
                 var sz = g.MeasureString(t, f);
-                rGroup = new Rectangle((int)(LW - 28 - sz.Width), 817, (int)sz.Width, (int)sz.Height);
+                rGroup = new Rectangle((int)(LW - 28 - sz.Width), FootY + 5, (int)sz.Width, (int)sz.Height);
                 g.DrawString(t, f, b, rGroup.X, rGroup.Y);
-                rBrand = new Rectangle(28, 810, 110, 30);
+                rBrand = new Rectangle(28, FootY - 2, 110, 30);
             }
         }
 
@@ -895,19 +1067,20 @@ namespace HbAi.XboxDns
                     g.DrawArc(pen, ar, pulse * 360f, 90f);
                 }
             }
-            // значок питания
-            var c = new PointF(r.X + r.Width / 2, r.Y + r.Height / 2 - 14);
-            using (var pen = new Pen(active ? Ink : Color.White, 7f) { StartCap = LineCap.Round, EndCap = LineCap.Round })
+            // значок питания; размеры заданы для кнопки 200×200 и уменьшаются вместе с ней
+            float z = r.Width / 200f;
+            var c = new PointF(r.X + r.Width / 2, r.Y + r.Height / 2 - 14 * z);
+            using (var pen = new Pen(active ? Ink : Color.White, 7f * z) { StartCap = LineCap.Round, EndCap = LineCap.Round })
             {
-                g.DrawArc(pen, c.X - 32, c.Y - 32, 64, 64, -60, 300);
-                g.DrawLine(pen, c.X, c.Y - 40, c.X, c.Y - 6);
+                g.DrawArc(pen, c.X - 32 * z, c.Y - 32 * z, 64 * z, 64 * z, -60, 300);
+                g.DrawLine(pen, c.X, c.Y - 40 * z, c.X, c.Y - 6 * z);
             }
-            using (var f = Pt(fHead, 13f))
+            using (var f = Pt(fHead, 13f * z))
             using (var b = new SolidBrush(active ? Ink : Soft))
             {
                 string t = active ? "ВКЛ" : "ВЫКЛ";
                 var sz = g.MeasureString(t, f);
-                g.DrawString(t, f, b, c.X - sz.Width / 2, r.Y + r.Height - 62);
+                g.DrawString(t, f, b, c.X - sz.Width / 2, r.Y + r.Height - 62 * z);
             }
         }
 
@@ -996,8 +1169,15 @@ namespace HbAi.XboxDns
             checking = true; checkSet = set; check = null; bestNote = null; Invalidate();
             ThreadPool.QueueUserWorkItem(_ =>
             {
-                var res = Probe.Service(set);
-                Ui(() => { checking = false; check = res; checkSet = set; Invalidate(); });
+                string[] res = null;
+                try { res = Probe.Service(set); }
+                catch (Exception) { }   // сбой внутри проверки: карточка остаётся пустой, программа работает дальше
+                Ui(() =>
+                {
+                    checking = false; check = res; checkSet = set;
+                    if (res == null) bestNote = "Проверка не удалась, попробуйте ещё раз";
+                    Invalidate();
+                });
             });
         }
 
@@ -1007,21 +1187,28 @@ namespace HbAi.XboxDns
             if (checking) return;
             checking = true; checkSet = -2; check = null; bestNote = null; Invalidate();
             int current = dnsSet;
+            bool wasActive = active;
             ThreadPool.QueueUserWorkItem(_ =>
             {
                 var all = new string[Dns.Count][];
-                var th = Enumerable.Range(0, Dns.Count).Where(k => k != Dns.XboxSet)
-                    .Select(k => new Thread(() => all[k] = Probe.Service(k)) { IsBackground = true }).ToArray();
-                foreach (var x in th) x.Start();
-                foreach (var x in th) x.Join();
-                int best = Probe.Best(all, current);
-                int good = Probe.Good(all[best]);
+                var real = Probe.Once(Probe.Real);
+                var sets = Enumerable.Range(0, Dns.Count).Where(k => k != Dns.XboxSet).ToArray();
+                // сбой внутри проверки одного сервиса: он остаётся непроверенным и лучшим не станет
+                try { Probe.Together(sets.Length, n => all[sets[n]] = Probe.Service(sets[n], real)); }
+                catch (Exception) { }
+                int top = Probe.Best(all, -1);
                 Ui(() =>
                 {
-                    checking = false; check = all[best]; checkSet = best;
-                    string note = good == 0 ? "Сейчас ни один сервис не открывает нейросети" : "Лучший сейчас: " + Dns.Name[best] + " (" + good + " из " + Probe.Host.Length + ")";
-                    // если не открывает ни один — DNS не трогаем; пока идёт включение/выключение — тоже
-                    if (good > 0 && !busy && dnsSet == current && best != dnsSet)
+                    // Пока шёл поиск, человек мог сменить сервис, включить или выключить DNS. Тогда DNS не трогаем,
+                    // в карточке оставляем выбранный сервис и просто называем лучший.
+                    bool moved = busy || dnsSet != current || active != wasActive;
+                    // включённый сервис из-за одного сайта не меняем: см. Probe.Best
+                    int best = moved ? top : Probe.Best(all, current, active ? 2 : 1);
+                    int show = moved ? dnsSet : best;
+                    checking = false; check = all[show]; checkSet = show;
+                    string note = Probe.BestNote(all, best, top);
+                    // если не открывает ни один — DNS не трогаем
+                    if (!moved && Probe.Good(all[best]) > 0 && best != dnsSet)
                     {
                         dnsSet = best;
                         if (active) { Apply(true, note); return; }
@@ -1146,11 +1333,8 @@ namespace HbAi.XboxDns
             {
                 MainForm.ForceScale = float.Parse(args[1], System.Globalization.CultureInfo.InvariantCulture);
                 using (var f = new MainForm())
-                using (var bmp = new Bitmap(f.ClientSize.Width, f.ClientSize.Height))
-                {
-                    f.DrawToBitmap(bmp, new Rectangle(Point.Empty, f.ClientSize));
+                using (var bmp = f.Snapshot())
                     bmp.Save(args[2], System.Drawing.Imaging.ImageFormat.Png);
-                }
                 return;
             }
             Application.Run(new MainForm());

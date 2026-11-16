@@ -8,8 +8,24 @@ final class LogicTests: XCTestCase {
     // ---------- адреса ----------
 
     func testServiceAddresses() {
-        XCTAssertEqual(Services.setOf("109.120.177.170"), 1)
-        XCTAssertEqual(Services.setOf("45.88.163.92"), 1)
+        XCTAssertEqual(Services.setOf("217.144.190.216"), 1)
+        XCTAssertEqual(Services.setOf("109.120.187.249"), 1)
+        XCTAssertNil(Services.setOf("109.120.177.170"), "адреса MagicDNS из 1.23–1.24 за сервис не выдаются: сервис с них переехал")
+        XCTAssertNil(Services.setOf("45.88.163.92"))
+        XCTAssertEqual(Services.setOf("153.80.200.170").map { Services.name[$0] }, "Перевал")
+        for ip in ["179.236.130.10", "179.236.130.11", "31.31.207.68"] {
+            XCTAssertNil(Services.setOf(ip), "Geodema и WebShift в программу не взяты: приложение к платному VPN")
+            XCTAssertFalse(Services.isStale(ip))
+        }
+        XCTAssertEqual(Services.name, ["GeoHide EU", "MagicDNS", "Перевал", "Xbox DNS"])
+        for (k, ips) in Services.v4.enumerated() {
+            XCTAssertFalse(ips.isEmpty, "у сервиса \(Services.name[k]) есть адрес")
+            for ip in ips {
+                XCTAssertEqual(Services.setOf(ip), k, "адрес \(ip) узнаётся как адрес своего сервиса")
+                XCTAssertFalse(Services.isStale(ip), "рабочий адрес \(ip) не помечен как старый")
+            }
+        }
+        XCTAssertEqual(Set(Services.v4.flatMap { $0 }).count, Services.v4.flatMap { $0 }.count, "ни один адрес не принадлежит двум сервисам")
         XCTAssertEqual(Services.setOf("143.20.64.192"), 0)
         XCTAssertEqual(Services.setOf("5.175.161.40"), 0)
         XCTAssertEqual(Services.name[0], "GeoHide EU", "первым стоит сервис для нейросетей")
@@ -34,7 +50,9 @@ final class LogicTests: XCTestCase {
         XCTAssertTrue(Services.isStale("83.220.169.155"))
         XCTAssertFalse(Services.isStale("143.20.64.192"))
         XCTAssertFalse(Services.isStale("5.175.161.40"))
-        XCTAssertFalse(Services.isStale("109.120.177.170"))
+        XCTAssertTrue(Services.isStale("109.120.177.170"), "адреса MagicDNS из 1.23–1.24 помечены как старые")
+        XCTAssertTrue(Services.isStale("45.88.163.92"))
+        XCTAssertFalse(Services.isStale("217.144.190.216"))
         XCTAssertFalse(Services.isStale("192.168.1.1"))
     }
 
@@ -42,6 +60,11 @@ final class LogicTests: XCTestCase {
         for list in [Services.short, Services.opens, Services.site, Services.url] { XCTAssertEqual(list.count, Services.count) }
         XCTAssertEqual(Services.v4.count, Services.count)
         XCTAssertEqual(Services.name[Services.xboxSet], "Xbox DNS")
+        XCTAssertEqual(Probe.label.count, Probe.host.count)
+        XCTAssertEqual(Probe.owner.count, Probe.host.count)
+        XCTAssertEqual(Set(Probe.host).count, Probe.host.count, "сайты не повторяются")
+        XCTAssertEqual(Array(Probe.label.prefix(6)), ["ChatGPT", "Claude", "Gemini", "ElevenLabs", "Grok", "Perplexity"], "первые шесть — как раньше")
+        XCTAssertEqual(Probe.host[site("Copilot")], "copilot.com", "Copilot проверяется по имени, куда переадресует copilot.microsoft.com")
     }
 
     // ---------- проверка сайтов ----------
@@ -55,6 +78,14 @@ final class LogicTests: XCTestCase {
         XCTAssertEqual(Probe.verdict("0.0.0.0"), Probe.zero)
         XCTAssertEqual(Probe.verdict(""), Probe.zero)
         XCTAssertNil(Probe.verdict("1.2.3.4"))
+    }
+
+    func testRefused() {
+        XCTAssertTrue(Probe.refused(";; ->>HEADER<<- opcode: QUERY, status: REFUSED, id: 1"), "отказ — не «адреса нет»")
+        XCTAssertTrue(Probe.refused(";; ->>HEADER<<- opcode: QUERY, status: SERVFAIL, id: 2"))
+        XCTAssertFalse(Probe.refused(";; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 3"), "ответ без адресов")
+        XCTAssertFalse(Probe.refused(";; ->>HEADER<<- opcode: QUERY, status: NXDOMAIN, id: 4"), "такого имени нет")
+        XCTAssertFalse(Probe.refused(""), "заголовка нет — считаем, что отказа не было")
     }
 
     func testDigAll() {
@@ -115,21 +146,161 @@ final class LogicTests: XCTestCase {
         XCTAssertEqual(Probe.classify("302 https://x/Unsupported-Country"), Probe.blocked, "регистр не важен")
         XCTAssertEqual(Probe.classify("302 https://x/service-not-available"), Probe.blocked)
         XCTAssertEqual(Probe.classify("000 "), Probe.noLink)
+        XCTAssertEqual(Probe.classify("503 "), Probe.noLink, "сайт или прокси не справился — нет связи, а не «открывается»")
+        XCTAssertEqual(Probe.classify("502 "), Probe.noLink)
+        XCTAssertEqual(Probe.classify("451 "), Probe.blocked, "отказ по закону")
+        XCTAssertEqual(Probe.classify("403 "), Probe.ok, "403 без слов о стране — так отвечает Claude до входа")
+        XCTAssertEqual(Probe.classify("421 "), Probe.ok, "так отвечает корень api.openai.com через прокси")
+        XCTAssertEqual(Probe.classify("302 https://example.com/page-5"), Probe.ok, "пятёрка не в начале — не код 5xx")
         XCTAssertEqual(Probe.classify(""), Probe.noLink, "curl ничего не вывел")
     }
 
-    private func res(_ ok: Int) -> [String] { (0..<6).map { $0 < ok ? Probe.ok : Probe.noLink } }
+    private func res(_ ok: Int) -> [String] { (0..<Probe.host.count).map { $0 < ok ? Probe.ok : Probe.noLink } }
+    private func site(_ label: String) -> Int { Probe.label.firstIndex(of: label)! }
+
+    /// Ответы сервиса по подписям сайтов; про остальные сайты сервис молчит.
+    private func answers(_ pairs: [String: [String]]) -> [[String]?] {
+        var ips = [[String]?](repeating: nil, count: Probe.host.count)
+        for (label, list) in pairs { ips[site(label)] = list }
+        return ips
+    }
+
+    /// Как в программе: три сервиса для нейросетей и Xbox, который не проверяется (nil).
+    private func four(_ a: Int, _ b: Int, _ c: Int) -> [[String]?] { [res(a), res(b), res(c), nil] }
 
     func testBest() {
-        // как в программе: GeoHide, MagicDNS и Xbox, который не проверяется (nil)
-        XCTAssertEqual(Probe.best([res(4), res(6), nil], current: -1), 1, "больше сайтов")
-        XCTAssertEqual(Probe.best([res(5), res(5), nil], current: -1), 0, "при равенстве — раньше в списке")
-        XCTAssertEqual(Probe.best([res(5), res(5), nil], current: 1), 1, "при равенстве остаётся текущий")
-        XCTAssertEqual(Probe.best([res(0), res(0), nil], current: 1), 1, "ничего не открывается — остаётся текущий")
-        XCTAssertNil([res(2), res(4), nil][Services.xboxSet], "в этом наборе Xbox — непроверенный")
-        XCTAssertEqual(Probe.best([res(2), res(4), nil], current: Services.xboxSet), 1, "текущий Xbox не мешает")
-        XCTAssertEqual(Probe.best([res(0), res(0), nil], current: Services.xboxSet), 0, "текущий Xbox и ничего не открывается — первый проверенный, не Xbox")
+        XCTAssertNil(four(0, 0, 0)[Services.xboxSet], "в этом наборе Xbox — непроверенный")
+        XCTAssertEqual(Probe.best(four(4, 6, 3), current: -1), 1, "больше сайтов")
+        XCTAssertEqual(Probe.best(four(5, 3, 5), current: -1), 0, "при равенстве — раньше в списке")
+        XCTAssertEqual(Probe.best(four(5, 3, 5), current: 2), 2, "при равенстве остаётся текущий")
+        XCTAssertEqual(Probe.best(four(0, 0, 0), current: 1), 1, "ничего не открывается — остаётся текущий")
+        XCTAssertEqual(Probe.best(four(2, 4, 3), current: Services.xboxSet), 1, "текущий Xbox не мешает")
+        XCTAssertEqual(Probe.best(four(0, 0, 0), current: Services.xboxSet), 0, "текущий Xbox и ничего не открывается — первый проверенный, не Xbox")
         XCTAssertEqual(Probe.best([nil, res(0), res(0)], current: -1), 1, "непроверенный первым не выбирается")
+    }
+
+    func testBestKeepsCurrentForOneSite() {
+        XCTAssertEqual(Probe.best(four(11, 12, 10), current: 0, margin: 2), 0, "DNS включён, лучший обогнал на один сайт — остаёмся")
+        XCTAssertEqual(Probe.best(four(11, 13, 10), current: 0, margin: 2), 1, "обогнал на два — переключаемся")
+        XCTAssertEqual(Probe.best(four(11, 12, 10), current: 0, margin: 1), 1, "DNS выключен — переключаемся и из-за одного сайта")
+        XCTAssertEqual(Probe.best(four(0, 0, 1), current: 0, margin: 2), 2, "текущий не открывает ничего — уходим")
+        XCTAssertEqual(Probe.best(four(11, 12, 12), current: 2, margin: 2), 2, "текущий сам лучший — остаётся")
+        XCTAssertEqual(Probe.best(four(9, 11, 13), current: 0, margin: 2), 2, "среди обогнавших выбирается самый лучший")
+        XCTAssertEqual(Probe.best(four(13, 11, 12), current: 2, margin: 2), 2, "текущий отстал на один сайт от первого в списке — остаётся")
+    }
+
+    func testBestNote() {
+        let n = Probe.host.count
+        XCTAssertEqual(Probe.bestNote(four(11, 12, 10), best: 1, top: 1), "Лучший сейчас: MagicDNS (12 из \(n))")
+        XCTAssertEqual(Probe.bestNote(four(11, 12, 10), best: 0, top: 1), "Оставили GeoHide EU (11 из \(n)): у MagicDNS всего на сайт больше")
+        XCTAssertEqual(Probe.bestNote(four(11, 12, 12), best: 2, top: 1), "Лучший сейчас: Перевал (12 из \(n))", "при равенстве текущий и назван лучшим")
+        XCTAssertEqual(Probe.bestNote(four(0, 0, 0), best: 0, top: 0), "Сейчас ни один сервис не открывает нейросети")
+    }
+
+    // ---------- вторая сверка: прокси сервиса — адрес, отданный на сайты разных владельцев ----------
+
+    func testShared() {
+        XCTAssertEqual(Probe.shared(answers(["ChatGPT": ["179.236.130.10"], "Claude": ["179.236.130.10"]])), ["179.236.130"], "два владельца — прокси")
+        XCTAssertEqual(Probe.shared(answers(["Gemini": ["142.250.154.101"], "NotebookLM": ["142.250.154.102"], "AI Studio": ["142.250.154.113"]])), [],
+                       "только сайты Google — не прокси")
+        XCTAssertEqual(Probe.shared(answers(["ChatGPT": ["5.175.161.3"], "Grok": ["5.175.161.40"]])).count, 1, "разные адреса одной сети /24 — один прокси")
+        XCTAssertTrue(Probe.shared(answers(["ChatGPT": ["1.1.1.1", "5.175.161.3"], "Grok": ["2.2.2.2", "5.175.161.40"]])).contains("5.175.161"),
+                      "смотрим все адреса ответа, а не только первый")
+        XCTAssertEqual(Probe.shared(answers([:])), [], "сервис ни на что не ответил")
+        for l in ["Gemini", "NotebookLM", "AI Studio"] { XCTAssertEqual(Probe.owner[site(l)], "Google") }
+        for l in ["ChatGPT", "Sora", "API OpenAI"] { XCTAssertEqual(Probe.owner[site(l)], "OpenAI") }
+        XCTAssertEqual(Probe.owner[site("Claude")], Probe.owner[site("API Claude")])
+        XCTAssertNotEqual(Probe.owner[site("Claude")], "OpenAI")
+    }
+
+    func testKnown() {
+        let proxy: Set<String> = ["179.236.130"], google: Set<String> = ["142.251.1.100"]
+        XCTAssertTrue(Probe.known(google, ["142.250.154.101"], proxy).contains("142.250.154.101"), "адрес не из прокси — настоящий")
+        XCTAssertFalse(Probe.known(google, ["179.236.130.10"], proxy).contains("179.236.130.10"), "адрес прокси настоящим не становится")
+        XCTAssertTrue(Probe.known(google, ["179.236.130.10"], proxy).contains("142.251.1.100"), "ответы обычных DNS остаются")
+        XCTAssertEqual(Probe.known(google, nil, proxy), google, "сервис промолчал — только ответы обычных DNS")
+    }
+
+    func testVerdictsLikeGeodema() {
+        // 14.11.2026: Geodema сайты Google не подменяет и отдал для AI Studio настоящий адрес из сети, которую обычные DNS не назвали
+        let google: Set<String> = ["142.251.1.100"]
+        let res = Probe.verdicts(answers(["ChatGPT": ["179.236.130.10"], "Claude": ["179.236.130.10"], "AI Studio": ["142.250.154.101"]]),
+                                 real: { $0 == "aistudio.google.com" ? google : [] }, ask: { _, _ in Probe.ok })
+        XCTAssertEqual(res.count, Probe.host.count)
+        XCTAssertEqual(res[site("AI Studio")], Probe.direct, "настоящий адрес Google — «напрямую», а не «открывается»")
+        XCTAssertEqual(res[site("ChatGPT")], Probe.ok)
+        XCTAssertEqual(res[site("Claude")], Probe.ok)
+        XCTAssertEqual(res[site("Grok")], Probe.noDns, "про Grok сервис промолчал")
+    }
+
+    func testVerdictsOtherCases() {
+        let silent: (String) -> Set<String> = { _ in [] }
+        let opens: (String, String) -> String = { _, _ in Probe.ok }
+        XCTAssertEqual(Probe.verdicts(answers(["ChatGPT": ["179.236.130.10"], "Claude": ["179.236.130.10"], "Spotify": ["151.101.67.42"]]),
+                                      real: silent, ask: opens)[site("Spotify")], Probe.direct,
+                       "обычные DNS молчат, но адрес отдан только одному сайту — «напрямую»")
+        let cf = Probe.verdicts(answers(["ChatGPT": ["8.47.69.0"], "Grok": ["8.47.69.0"]]), real: { _ in ["8.47.69.0"] }, ask: opens)
+        XCTAssertEqual(cf[site("ChatGPT")], Probe.direct, "общий адрес Cloudflare, названный обычными DNS, — «напрямую»")
+        XCTAssertEqual(cf[site("Grok")], Probe.direct)
+        let one = Probe.verdicts(answers(["ChatGPT": ["8.47.69.0"], "Grok": ["8.47.69.0"]]), real: { $0 == "grok.com" ? ["8.47.69.0"] : [] }, ask: opens)
+        XCTAssertEqual([one[site("ChatGPT")], one[site("Grok")]], [Probe.direct, Probe.direct],
+                       "общий адрес Cloudflare назван обычными DNS только для одного сайта — такая сеть не прокси, «напрямую» оба")
+        let mixed = Probe.verdicts(answers(["ChatGPT": ["5.175.161.40"], "Grok": ["5.175.161.3"], "Perplexity": ["104.18.26.48"]]),
+                                   real: { $0 == "www.perplexity.ai" ? ["104.18.26.48"] : ["8.47.69.0"] }, ask: opens)
+        XCTAssertEqual([mixed[site("ChatGPT")], mixed[site("Grok")], mixed[site("Perplexity")]], [Probe.ok, Probe.ok, Probe.direct],
+                       "сеть прокси, которую обычные DNS не называли, прокси и остаётся")
+        let g = Probe.verdicts(answers(["Gemini": ["142.250.154.101"], "NotebookLM": ["142.250.154.101"], "AI Studio": ["142.250.154.101"]]), real: silent, ask: opens)
+        XCTAssertEqual([g[site("Gemini")], g[site("NotebookLM")], g[site("AI Studio")]], [Probe.direct, Probe.direct, Probe.direct],
+                       "один адрес на три сайта Google и больше ни на чей — все три «напрямую»")
+        let named = Probe.verdicts(answers(["ChatGPT": ["1.1.1.1"], "Claude": ["1.1.1.1"], "Notion": ["1.1.1.9"]]), real: silent,
+                                   ask: { h, ip in h == "www.notion.so" && ip == "1.1.1.9" ? Probe.blocked : h == "claude.ai" ? Probe.captcha : Probe.ok })
+        XCTAssertEqual([named[site("ChatGPT")], named[site("Claude")], named[site("Notion")]], [Probe.ok, Probe.captcha, Probe.blocked],
+                       "сайт спрашивают по его имени и адресу от сервиса")
+        let zero = Probe.verdicts([[String]?](repeating: ["0.0.0.0"], count: Probe.host.count), real: silent, ask: { _, _ in Probe.ok })
+        XCTAssertEqual(Set(zero), [Probe.zero], "сервис отвечает 0.0.0.0 на всё (как Xbox DNS) — «не пускает»")
+        let empty = Probe.verdicts([[String]?](repeating: [], count: Probe.host.count), real: silent, ask: { _, _ in Probe.ok })
+        XCTAssertEqual(Set(empty), [Probe.zero], "ответ без адресов — «не пускает»")
+    }
+
+    func testMemoAsksOnce() {
+        let lock = NSLock()
+        var calls = 0
+        let memo = Probe.Memo { host in
+            lock.lock(); calls += 1; lock.unlock()
+            Thread.sleep(forTimeInterval: 0.05)
+            return [host]
+        }
+        DispatchQueue.concurrentPerform(iterations: 8) { i in _ = memo.get(i % 2 == 0 ? "claude.ai" : "grok.com") }
+        XCTAssertEqual(calls, 2, "по одному запросу на сайт, сколько бы потоков ни спрашивало")
+        XCTAssertEqual(memo.get("claude.ai"), ["claude.ai"])
+        XCTAssertEqual(memo.get("grok.com"), ["grok.com"])
+        XCTAssertEqual(calls, 2)
+    }
+
+    func testColumns() {
+        let left = Probe.column(0), right = Probe.column(1)
+        XCTAssertEqual(left + right, Array(Probe.host.indices), "обе колонки вместе — все сайты по порядку")
+        XCTAssertTrue(left.count - right.count == 1 || left.count - right.count == 2, "во второй колонке остаётся место под итог")
+    }
+
+    func testEachKeepsOrderAndDoesNotStarve() {
+        // как «Найти лучший», с запасом: четыре набора проверок разом, в каждом все сайты, и каждая запускает программу
+        let started = Date()
+        let lock = NSLock()
+        var codes: [Int32] = []
+        var order: [[Int]] = []
+        DispatchQueue.concurrentPerform(iterations: 4) { _ in
+            let got: [Int] = Probe.each { k in
+                let r = Shell.run("/bin/sleep", ["0.2"], timeout: 15)
+                lock.lock(); codes.append(r.code); lock.unlock()
+                return k
+            }
+            lock.lock(); order.append(got); lock.unlock()
+        }
+        XCTAssertEqual(codes.count, 4 * Probe.host.count)
+        XCTAssertTrue(codes.allSatisfy { $0 == 0 }, "ни один запуск не упёрся в тайм-аут")
+        XCTAssertTrue(order.allSatisfy { $0 == Array(Probe.host.indices) }, "результаты идут в порядке списка сайтов")
+        XCTAssertLessThan(Date().timeIntervalSince(started), 12, "шестьдесят проверок по 0,2 с при двенадцати одновременных — около секунды")
     }
 
     // ---------- окно после включения ----------
@@ -176,13 +347,19 @@ final class LogicTests: XCTestCase {
 
     func testPlanWithoutIpv6() {
         let p = Dns.plan(set: 1, services: [wifi4], off: [])
-        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 109.120.177.170 45.88.163.92"] + flush)
+        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 217.144.190.216 109.120.187.249"] + flush)
         XCTAssertEqual(p.off, [])
+    }
+
+    func testPlanSingleAddressService() {
+        let pereval = Services.setOf("153.80.200.170")!
+        let p = Dns.plan(set: pereval, services: [wifi4], off: [])
+        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 153.80.200.170"] + flush, "у «Перевала» один адрес — ставится один DNS")
     }
 
     func testPlanTurnsIpv6OffAndRemembers() {
         let p = Dns.plan(set: 1, services: [wifi6], off: [])
-        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 109.120.177.170 45.88.163.92", "\(ns) -setv6off \"Wi-Fi\""] + flush)
+        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 217.144.190.216 109.120.187.249", "\(ns) -setv6off \"Wi-Fi\""] + flush)
         XCTAssertEqual(p.off, ["Wi-Fi"])
     }
 

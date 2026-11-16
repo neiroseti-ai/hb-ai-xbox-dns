@@ -39,7 +39,7 @@ h1{font-family:'Unbounded',sans-serif;font-weight:800;font-size:clamp(30px,5vw,5
 .phone{display:none;margin-top:18px;padding:16px 18px;border-radius:16px;background:rgba(255,224,102,.10);border:1px solid rgba(255,224,102,.35);font-size:15px;line-height:1.45;color:#f3ecc4}
 .phone a{color:#ffe066;font-weight:700}
 .shot{border-radius:22px;overflow:hidden;box-shadow:0 30px 70px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.12),0 0 90px rgba(124,92,255,.3);width:340px;justify-self:end}
-.shot img{display:block;width:100%}
+.shot img{display:block;width:100%;height:auto}
 .facts{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:48px}
 .fact{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);border-radius:20px;padding:22px 22px}
 .fact b{display:block;font-family:'Unbounded',sans-serif;font-weight:800;font-size:22px;color:#ffe066;margin-bottom:8px}
@@ -75,13 +75,13 @@ footer{margin-top:52px;padding-top:22px;border-top:1px solid rgba(255,255,255,.1
    <p class="alt" id="alt">Есть версия <a href="https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Smart_DNS_mac.zip">для Mac</a> · <a href="https://github.com/neiroseti-ai/hb-ai-xbox-dns">исходный код на GitHub</a></p>
    <div class="phone" id="phone">Это программа для компьютера. Откройте эту страницу на Windows или Mac, или <a href="#" id="share">отправьте себе ссылку</a>.</div>
   </div>
-  <div class="shot"><img src="screenshot.png" width="440" height="852" alt="Окно программы: большая кнопка включения, выбор сервиса, результат проверки по сайтам"></div>
+  <div class="shot"><img src="screenshot.png" width="440" height="888" alt="Окно программы: большая кнопка включения, выбор сервиса, результат проверки по сайтам"></div>
  </div>
 
  <div class="facts">
   <div class="fact"><b>Одна кнопка</b><span>Нажали — DNS включился на всех подключениях. Нажали ещё раз — вернулся обычный.</span></div>
   <div class="fact"><b>Проверить</b><span>По каждому сайту видно, открывается он, стоит блок страны или капча.</span></div>
-  <div class="fact"><b>Найти лучший</b><span>Перебирает все сервисы и включает тот, где открывается больше всего.</span></div>
+  <div class="fact"><b>Найти лучший</b><span>Перебирает все сервисы и показывает, где открывается больше всего. Включённый сервис меняет, если другой лучше хотя бы на два сайта.</span></div>
  </div>
 
  <div class="steps">
