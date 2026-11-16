@@ -68,7 +68,7 @@ final class LogicTests: XCTestCase {
         XCTAssertEqual(Probe.host[site("Copilot")], "copilot.com", "Copilot проверяется по имени, куда переадресует copilot.microsoft.com")
     }
 
-    // Шрифты окна: имя, которое просит программа, должно быть записано в файле. С 1.22 по 1.24 программа просила
+    // Шрифты окна: имя, которое просит программа, должно быть записано в файле. С первой версии для Mac (1.2) по 1.24 программа просила
     // «Unbounded-ExtraBold» и «Manrope-…» (имена файлов), таких шрифтов нет, и окно рисовалось системным.
     func testFontNamesMatchFiles() {
         let res = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
