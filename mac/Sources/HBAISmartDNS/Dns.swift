@@ -12,7 +12,7 @@ enum Services {
     static let name = ["GeoHide EU", "MagicDNS", "Перевал", "Xbox DNS"]
     static let short = ["GeoHide", "MagicDNS", "Перевал", "Xbox"]
     static let v4: [[String]] = [
-        ["143.20.64.192", "5.175.161.40"],
+        ["5.175.161.40", "143.20.64.192"],   // первым тот, что 16.11.2026 отвечал на все запросы (см. XboxDns.cs)
         ["217.144.190.216", "109.120.187.249"],
         ["153.80.200.170"],
         ["111.88.96.54", "111.88.96.55"],
@@ -21,7 +21,7 @@ enum Services {
     static let opens = [
         "ChatGPT, Claude, ElevenLabs, Grok и другие; Gemini — нет. Точнее — «Проверить»",
         "почти весь список; Gemini — когда как. Точнее — «Проверить»",
-        "ChatGPT, Claude, Grok, Copilot; Gemini — когда как, ElevenLabs — нет. Точнее — «Проверить»",
+        "Claude — да; ChatGPT, Grok, Gemini — когда как; ElevenLabs — нет. Точнее — «Проверить»",
         "только Xbox Live, нейросети — нет",
     ]
     static let site = ["geohide.ru", "magicdns.ru", "pereval.top", "xbox-dns.ru"]

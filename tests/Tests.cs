@@ -1077,7 +1077,7 @@ namespace HbAi.XboxDns
                 var net = new FakeNet("Wi-Fi"); string f = ListFile();
                 Dns.Enable(Magic, net, f); net.Take();
                 Dns.Enable(0, net, f);
-                Eq("dns 10 143.20.64.192,5.175.161.40", net.Take());
+                Eq("dns 10 5.175.161.40,143.20.64.192", net.Take());
                 Dns.Disable(net, f);
                 Eq("dns 10 reset; v6on Wi-Fi", net.Take());
                 Dns.Disable(net, f);

@@ -13,7 +13,7 @@ from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlsplit
 import probe_dns as p
 
-SERVICES = [("GeoHide EU", ["143.20.64.192", "5.175.161.40"]), ("MagicDNS", ["217.144.190.216", "109.120.187.249"]),
+SERVICES = [("GeoHide EU", ["5.175.161.40", "143.20.64.192"]), ("MagicDNS", ["217.144.190.216", "109.120.187.249"]),
             ("Перевал", ["153.80.200.170"])]
 UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
 REAL = {}

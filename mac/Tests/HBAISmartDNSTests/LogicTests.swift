@@ -403,7 +403,7 @@ final class LogicTests: XCTestCase {
     func testPlanSwitchDoesNotTurnOffTwice() {
         let off = NetService(name: "Wi-Fi", ipv6Auto: false, hasGlobalIpv6: false)   // уже выключен программой
         let p = Dns.plan(set: 0, services: [off], off: ["Wi-Fi"])
-        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 143.20.64.192 5.175.161.40"] + flush)
+        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 5.175.161.40 143.20.64.192"] + flush)
         XCTAssertEqual(p.off, ["Wi-Fi"])
     }
 

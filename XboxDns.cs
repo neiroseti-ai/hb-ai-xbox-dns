@@ -32,6 +32,10 @@ namespace HbAi.XboxDns
         // Notion и Spotify не подменяет. Gemini вечером 14.11.2026 открывался без капчи, 15.11.2026 в 01:22 — капча
         // шесть раз из шести. Адрес у него один: замолчит — сайты перестанут открываться, пока DNS не выключить
         // или не выбрать другой сервис.
+        // Перепроверка 16.11.2026, 05:35–06:20 МСК, пять срезов: MagicDNS — 13 из 15 каждый раз, GeoHide — 11–12,
+        // «Перевал» — от 7 до 11: ChatGPT, Grok и Copilot через его единственный узел открывались через раз,
+        // поэтому подпись обещает через него только Claude. Адрес GeoHide 143.20.64.192 ответил на 54 одиночных
+        // запроса из 105, 5.175.161.40 — на 102 из 105: он и стоит первым.
         // Ни один из трёх не открывает сайты, заблокированные в России: 14.11.2026 одиннадцать таких сайтов
         // через каждого — «нет связи».
         // Geodema (179.236.130.10, 179.236.130.11) и WebShift (31.31.207.68) работают, но в программу не взяты:
@@ -45,7 +49,9 @@ namespace HbAi.XboxDns
         public static readonly string[] Name = { "GeoHide EU", "MagicDNS", "Перевал", "Xbox DNS" };
         public static readonly string[] Short = { "GeoHide", "MagicDNS", "Перевал", "Xbox" };
         public static readonly string[][] V4 = {
-            new[] { "143.20.64.192", "5.175.161.40" },
+            // Первым стоит 5.175.161.40: 16.11.2026 с 05:35 до 06:15 МСК 143.20.64.192 терял от четверти до трёх
+            // четвертей запросов, а этот отвечал на все. Windows спрашивает первый адрес и ждёт его секунду.
+            new[] { "5.175.161.40", "143.20.64.192" },
             new[] { "217.144.190.216", "109.120.187.249" },
             new[] { "153.80.200.170" },
             new[] { "111.88.96.54", "111.88.96.55" } };
@@ -56,7 +62,7 @@ namespace HbAi.XboxDns
         public static readonly string[] Opens = {
             "ChatGPT, Claude, ElevenLabs, Grok и другие; Gemini — нет. Точнее — «Проверить»",
             "почти весь список; Gemini — когда как. Точнее — «Проверить»",
-            "ChatGPT, Claude, Grok, Copilot; Gemini — когда как, ElevenLabs — нет. Точнее — «Проверить»",
+            "Claude — да; ChatGPT, Grok, Gemini — когда как; ElevenLabs — нет. Точнее — «Проверить»",
             "только Xbox Live, нейросети — нет" };
         public static readonly string[] Site = { "geohide.ru", "magicdns.ru", "pereval.top", "xbox-dns.ru" };
         public static readonly string[] Url = { "https://geohide.ru/", "https://magicdns.ru/", "https://pereval.top/", "https://xbox-dns.ru/" };
