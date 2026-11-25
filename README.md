@@ -1,6 +1,8 @@
 # HB AI · Smart DNS — ChatGPT, Claude, Gemini и ElevenLabs одной кнопкой
 
-Gemini, ElevenLabs или ChatGPT пишут «недоступно в вашей стране»? Эта бесплатная программа для Windows 10/11 (есть и [версия для Mac](#для-mac)) одной кнопкой включает Smart DNS — [GeoHide](https://geohide.ru/), [MagicDNS](https://magicdns.ru/) или [«Перевал»](https://pereval.top/), — и сервисы, которые сами ограничили работу в России, открываются как обычно. Остальной интернет при этом идёт напрямую: банки, Госуслуги и маркетплейсы работают как раньше.
+Gemini, ElevenLabs или ChatGPT пишут «недоступно в вашей стране»? Эта бесплатная программа для Windows 10/11 (есть и [версия для Mac](#для-mac)) одной кнопкой включает Smart DNS — [GeoHide](https://geohide.ru/) или [«Перевал»](https://pereval.top/), — и сервисы, которые сами ограничили работу в России, открываются как обычно. Остальной интернет при этом идёт напрямую: банки, Госуслуги и маркетплейсы работают как раньше.
+
+> **Версия 1.26.** Обновлены адреса GeoHide. MagicDNS убран из списка после того, как его обычные DNS перестали отвечать в проверке 24.11.2026. Для сверки адресов программа теперь использует Яндекс, Quad9 и AdGuard. Изменения для Windows и macOS одинаковые.
 
 > **Версия 1.25, 16 ноября 2026.** Сервисов для нейросетей стало три, а проверка показывает пятнадцать сайтов вместо шести. Добавлен [«Перевал»](https://pereval.top/). MagicDNS снова сменил адреса: в программе теперь `217.144.190.216` и `109.120.187.249`, они указаны на его сайте, а адреса из версий 1.23–1.24 с 14 ноября молчат. Если прежние стоят у вас, программа скажет об этом и по нажатию кнопки поставит рабочие. В проверке к ChatGPT, Claude, Gemini, ElevenLabs, Grok и Perplexity добавились Copilot, Sora, NotebookLM, Google AI Studio, API Claude и OpenAI, OpenRouter, Notion и Spotify, а под списком написано, сколько сайтов открывается. Проверка стала строже. Прокси сервиса теперь считается только адрес, который он отдаёт на сайты разных владельцев: без этого про сайт Google, который сервис на самом деле не подменяет, программа могла написать «открывается». Ответ с ошибкой сервера (код 5xx) теперь «нет связи», а сертификат на чужое имя программа за сайт не принимает. «Найти лучший» при включённом DNS больше не меняет сервис из-за разницы в один сайт: такая разница скачет от проверки к проверке, а смена сервиса меняет страну, из которой вас видят сайты. По проверке из Москвы 14.11.2026 MagicDNS открывал 14 сайтов из 15, GeoHide — 12, «Перевал» — 11. Gemini без капчи Google в этот вечер открывался через MagicDNS и «Перевал», а ночью через «Перевал» уже упирался в капчу; работает ли он после входа в аккаунт, мы не проверяли. Утром 16.11.2026, перед выпуском, проверили ещё раз: MagicDNS открывал 13 сайтов, GeoHide — 11–12, «Перевал» — от 7 до 11: ChatGPT и Grok через него открывались через раз, Copilot — в одной проверке из пяти. Один из двух адресов GeoHide, `143.20.64.192`, в это утро отвечал на половину запросов, поэтому первым в программе стоит `5.175.161.40`. Если GeoHide у вас уже включён, выключите и снова включите DNS кнопкой: адреса встанут в новом порядке. Версия для Mac обновлена так же, окно стало ниже и помещается на 13-дюймовом экране. В ней же исправлены шрифты: с первой версии для Mac (1.2, 23 октября 2026) программа просила их по неверным именам, и окно рисовалось системным шрифтом вместо фирменных. И сервис в переключателе теперь выбирается щелчком по всей ячейке, а не только по слову.
 
@@ -24,9 +26,9 @@ Gemini, ElevenLabs или ChatGPT пишут «недоступно в ваше�
 2. Если Windows напишет «Windows защитила ваш компьютер», нажмите **Подробнее** → **Выполнить в любом случае**, а на вопрос о правах администратора — **Да**.
 3. Выберите сервис и нажмите большую кнопку в окне программы.
 
-Не скачивается по кнопке? Прямые ссылки: [для Windows](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Xbox_DNS.exe) · 241 КБ · Windows 10/11, [для Mac](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Smart_DNS_mac.zip) · 890 КБ · macOS 13+. Бесплатно, открытый код.
+Не скачивается по кнопке? Прямые ссылки: [для Windows](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Xbox_DNS.exe) · 240 КБ · Windows 10/11, [для Mac](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Smart_DNS_mac.zip) · 893 КБ · macOS 13+. Бесплатно, открытый код.
 
-<img src="docs/screenshot.png" width="360" alt="Окно программы HB AI Smart DNS: кнопка включения, выбор сервиса GeoHide, MagicDNS, Перевал, Xbox и результат проверки по пятнадцати сайтам">
+<img src="docs/screenshot.png" width="360" alt="Окно программы HB AI Smart DNS: кнопка включения, выбор DNS-сервиса и результат проверки по пятнадцати сайтам">
 
 Не нужно искать адреса DNS и вручную менять настройки сетевого адаптера. Сделано в сообществе [«Нейросети и AI на практике»](https://vk.com/neiroseti_ai).
 
@@ -35,14 +37,13 @@ Gemini, ElevenLabs или ChatGPT пишут «недоступно в ваше�
 - Включает Smart DNS на всех активных сетевых подключениях, а выключает, возвращая обычный DNS от роутера или провайдера.
 - Даёт выбрать сервис:
 
-| Кнопка | Адреса | Что открывает (проверено 14.11.2026 из Москвы, МГТС) |
+| Кнопка | Адреса | Для чего |
 |---|---|---|
-| GeoHide EU | `5.175.161.40`, `143.20.64.192` | 12 сайтов из 15: ChatGPT, Claude, ElevenLabs, Grok, Sora, NotebookLM, AI Studio, API Claude и OpenAI, OpenRouter, Notion, Spotify. Gemini — капча Google, Perplexity и Copilot не подменяет. Три-четыре узла из семи не отвечали: страница может открыться не сразу. Утром 16.11.2026 — 11–12 сайтов; адрес `143.20.64.192` отвечал на половину запросов, поэтому первым стоит `5.175.161.40`. Если GeoHide уже включён прежней версией, выключите и включите DNS: иначе адреса останутся в старом порядке |
-| MagicDNS | `217.144.190.216`, `109.120.187.249` | 14 из 15: всё, кроме Spotify. Gemini вечером и ночью открывался без капчи, днём того же дня — через раз. Утром 16.11.2026 — 13: не открывался ещё и Notion |
-| Перевал | `153.80.200.170` | 11 из 15: ChatGPT, Claude, Gemini, Grok, Copilot, Sora, NotebookLM, AI Studio, API Claude и OpenAI, OpenRouter. Gemini вечером открывался без капчи, через полтора часа — уже капча Google. ElevenLabs, Perplexity, Notion и Spotify не подменяет. Адрес один: если он замолчит, сайты перестанут открываться, пока не выключите DNS или не выберете другой сервис. Утром 16.11.2026 — от 7 до 11 сайтов: ChatGPT и Grok открывались через раз, Copilot — в одной проверке из пяти |
-| Xbox | `111.88.96.54`, `111.88.96.55` | только Xbox Live, нейросети — нет |
+| GeoHide | 193.233.112.88, 37.230.192.51 | Smart DNS для ИИ-сервисов |
+| Перевал | 153.80.200.170 | Smart DNS для ИИ-сервисов |
+| Xbox | 111.88.96.54, 111.88.96.55 | Xbox Live |
 
-Что открывает каждый сервис, меняется за дни. Таблица — снимок на дату, точную картину даёт кнопка «Проверить».
+Доступность сайтов зависит от сети. Нажмите «Проверить», чтобы увидеть результат на своём подключении.
 
 - Кнопка **«Проверить»** спрашивает DNS выбранного сервиса напрямую, подключается к выданному адресу и показывает по каждому из пятнадцати сайтов: открывается, напрямую (сервис этот сайт не подменяет, он идёт как без программы), блок страны, капча Google или нет связи. DNS для этого включать не обязательно.
 - Кнопка **«Найти лучший»** делает то же для всех сервисов сразу и переключает программу на тот, где открывается больше всего сайтов. Сайты с пометкой «напрямую» в счёт не идут. Если DNS уже включён, сервис меняется, только когда другой открывает хотя бы на два сайта больше: смена сервиса меняет страну, из которой вас видят сайты, а за частую смену страны аккаунты, бывает, блокируют.
@@ -80,7 +81,7 @@ certutil -hashfile HB_AI_Xbox_DNS.exe SHA256
 
 ```powershell
 # включить
-Set-DnsClientServerAddress -InterfaceIndex <подключение> -ServerAddresses ('5.175.161.40','143.20.64.192')
+Set-DnsClientServerAddress -InterfaceIndex <подключение> -ServerAddresses ('193.233.112.88','37.230.192.51')
 # только если у провайдера есть IPv6: выключить его на время Smart DNS (подключение запоминается)
 Disable-NetAdapterBinding -Name <подключение> -ComponentID ms_tcpip6
 # выключить
@@ -97,7 +98,7 @@ Clear-DnsClientCache
 
 ## IPv6
 
-Smart DNS-сервисы (GeoHide, MagicDNS, «Перевал») работают только по IPv4. Если провайдер даёт IPv6, Windows может спрашивать IPv6-DNS провайдера и ходить к сайтам напрямую — тогда сайт пишет «недоступно в вашей стране», хотя DNS включён. Программа сама выключает IPv6 на время Smart DNS. Если хотите сделать это вручную:
+Smart DNS-сервисы (GeoHide и «Перевал») работают только по IPv4. Если провайдер даёт IPv6, Windows может спрашивать IPv6-DNS провайдера и ходить к сайтам напрямую — тогда сайт пишет «недоступно в вашей стране», хотя DNS включён. Программа сама выключает IPv6 на время Smart DNS. Если хотите сделать это вручную:
 
 1. Нажмите <kbd>Win</kbd>+<kbd>R</kbd>, введите `ncpa.cpl`, нажмите Enter — откроются сетевые подключения.
 2. Правой кнопкой по подключению, через которое вы в интернете (Wi-Fi или Ethernet) → **Свойства**.
@@ -155,7 +156,7 @@ DNS в Windows меняется только с правами админист�
 С 10 октября 2026 года xbox-dns.ru на запросы к нейросетям отвечает `0.0.0.0`, так же отвечает и его зашифрованный DNS. Это решение сервиса, а не провайдера. Для Xbox Live он по-прежнему работает.
 
 **Как включить Smart DNS вручную, без программы?**
-Параметры → Сеть и Интернет → свойства подключения → Изменить назначение DNS-сервера → вписать, например, `5.175.161.40` и `143.20.64.192` (GeoHide). Программа делает то же самое одной кнопкой и сразу для всех подключений.
+Параметры → Сеть и Интернет → свойства подключения → Изменить назначение DNS-сервера → вписать, например, `193.233.112.88` и `37.230.192.51` (GeoHide). Программа делает то же самое одной кнопкой и сразу для всех подключений.
 
 ## Сборка из исходников
 
@@ -169,13 +170,13 @@ build.bat
 
 ## Важно
 
-- Программа не связана с GeoHide, MagicDNS, «Перевалом» и xbox-dns.ru. Это бесплатные сервисы: доступ через них может пропасть в любой момент. Пока сервис включён, все ваши запросы DNS уходят ему, а соединения с сайтами из его списка идут через его серверы. Адреса в программе мы проверяем скриптами `tools/probe_dns.py` и `tools/probe_chain.py` и обновляем.
+- Программа не связана с GeoHide, «Перевалом» и xbox-dns.ru. Это бесплатные сервисы: доступ через них может пропасть в любой момент. Пока сервис включён, все ваши запросы DNS уходят ему, а соединения с сайтами из его списка идут через его серверы. Адреса в программе мы проверяем скриптами `tools/probe_dns.py` и `tools/probe_chain.py` и обновляем.
 - Пользуйтесь сервисами по их правилам. Ресурсы, заблокированные в России, программа не открывает.
 - Всё, что вы делаете с программой, вы делаете на свой риск.
 
 ## In English
 
-**HB AI · Smart DNS** is a free, open-source one-click Smart DNS switcher for Windows 10/11. It sets GeoHide, MagicDNS, Pereval or xbox-dns.ru DNS servers on all active network adapters (or resets them back to automatic), so services that restrict access from Russia — Gemini, ElevenLabs, ChatGPT, Claude — open normally, while all other traffic goes directly. No VPN, no background service, no installation: a single 241 KB exe that changes the same settings as `Set-DnsClientServerAddress`, `Clear-DnsClientCache`, and `Disable/Enable-NetAdapterBinding` (for IPv6 when the ISP provides it) directly through Windows CIM, checks GitHub for a newer release on start, and has a built-in reachability check for 15 sites: ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity, Copilot, Sora, NotebookLM, AI Studio, the Claude and OpenAI APIs, OpenRouter, Notion and Spotify. Written in C#, MIT license. [Download the latest release](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Xbox_DNS.exe).
+**HB AI · Smart DNS** is a free, open-source one-click Smart DNS switcher for Windows 10/11. It sets GeoHide, Pereval or xbox-dns.ru DNS servers on all active network adapters (or resets them back to automatic), so services that restrict access from Russia — Gemini, ElevenLabs, ChatGPT, Claude — open normally, while all other traffic goes directly. No VPN, no background service, no installation: a single 240 KB exe that changes the same settings as `Set-DnsClientServerAddress`, `Clear-DnsClientCache`, and `Disable/Enable-NetAdapterBinding` (for IPv6 when the ISP provides it) directly through Windows CIM, checks GitHub for a newer release on start, and has a built-in reachability check for 15 sites: ChatGPT, Claude, Gemini, ElevenLabs, Grok, Perplexity, Copilot, Sora, NotebookLM, AI Studio, the Claude and OpenAI APIs, OpenRouter, Notion and Spotify. Written in C#, MIT license. [Download the latest release](https://github.com/neiroseti-ai/hb-ai-xbox-dns/releases/latest/download/HB_AI_Xbox_DNS.exe).
 
 ## Лицензия
 
