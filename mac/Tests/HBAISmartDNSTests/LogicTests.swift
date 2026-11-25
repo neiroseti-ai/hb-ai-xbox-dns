@@ -364,7 +364,7 @@ final class LogicTests: XCTestCase {
 
     func testPlanWithoutIpv6() {
         let p = Dns.plan(set: 1, services: [wifi4], off: [])
-        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 217.144.190.216 109.120.187.249"] + flush)
+        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 153.80.200.170"] + flush)
         XCTAssertEqual(p.off, [])
     }
 
@@ -376,7 +376,7 @@ final class LogicTests: XCTestCase {
 
     func testPlanTurnsIpv6OffAndRemembers() {
         let p = Dns.plan(set: 1, services: [wifi6], off: [])
-        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 217.144.190.216 109.120.187.249", "\(ns) -setv6off \"Wi-Fi\""] + flush)
+        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 153.80.200.170", "\(ns) -setv6off \"Wi-Fi\""] + flush)
         XCTAssertEqual(p.off, ["Wi-Fi"])
     }
 
@@ -403,7 +403,7 @@ final class LogicTests: XCTestCase {
     func testPlanSwitchDoesNotTurnOffTwice() {
         let off = NetService(name: "Wi-Fi", ipv6Auto: false, hasGlobalIpv6: false)   // уже выключен программой
         let p = Dns.plan(set: 0, services: [off], off: ["Wi-Fi"])
-        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 5.175.161.40 143.20.64.192"] + flush)
+        XCTAssertEqual(p.cmds, ["\(ns) -setdnsservers \"Wi-Fi\" 193.233.112.88 37.230.192.51"] + flush)
         XCTAssertEqual(p.off, ["Wi-Fi"])
     }
 
