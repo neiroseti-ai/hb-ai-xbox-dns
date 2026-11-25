@@ -22,9 +22,8 @@ enum Probe {
     static let ok = "открывается", blocked = "блок страны", captcha = "капча Google", noLink = "нет связи", noDns = "DNS молчит", zero = "не пускает", direct = "напрямую"
     static let ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
 
-    // Обычные DNS для сверки. Яндекс и Google отвечают как для России, Quad9 — как для заграницы: у Cloudflare
-    // для России свои адреса, и 14.11.2026 GeoHide отдавал для Perplexity настоящие, но «заграничные».
-    static let control = ["77.88.8.8", "8.8.8.8", "9.9.9.9"]
+    // Обычные DNS для сверки: Яндекс, Quad9 и AdGuard.
+    static let control = ["77.88.8.8", "9.9.9.9", "94.140.14.14"]
 
     /// nil — сервер не ответил; "" — ответ без адреса; иначе первый IPv4.
     static func resolve(_ server: String, _ host: String) -> String? {

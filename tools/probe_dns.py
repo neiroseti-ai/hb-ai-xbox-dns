@@ -17,14 +17,15 @@ python tools/probe_dns.py — сводка по всем кандидатам (�
 import socket, struct, subprocess, sys
 from concurrent.futures import ThreadPoolExecutor
 
-# Первые шесть — адреса из программы 1.25. Остальные — для сравнения и на случай, если сервис вернётся.
+# Первые пять — адреса из программы 1.26. Остальные — для сравнения и на случай, если сервис вернётся.
 # Geodema и WebShift работают, но в программу не взяты: оба — бесплатное приложение к платному VPN того же оператора.
 CANDIDATES = [
-    ("GeoHide EU", "5.175.161.40"), ("GeoHide EU-2", "143.20.64.192"),
-    ("MagicDNS", "217.144.190.216"), ("MagicDNS-2", "109.120.187.249"),
+    ("GeoHide", "193.233.112.88"), ("GeoHide-2", "37.230.192.51"),
     ("Перевал", "153.80.200.170"), ("Xbox DNS", "111.88.96.54"),
     ("Geodema", "179.236.130.10"), ("Geodema-2", "179.236.130.11"),
     ("WebShift", "31.31.207.68"), ("Comss.one", "94.250.253.55"), ("Comss новый", "212.109.221.20"),
+    ("MagicDNS 1.25", "217.144.190.216"), ("MagicDNS 1.25-2", "109.120.187.249"),
+    ("GeoHide EU 1.25", "5.175.161.40"), ("GeoHide EU 1.25-2", "143.20.64.192"),
     ("MagicDNS до 14.11", "109.120.177.170"), ("GeoHide EU-3", "45.13.237.213"), ("GeoHide RU", "159.194.200.33"),
     ("Astracat", "135.106.217.200"), ("Malw.link", "179.254.166.171"), ("Dagami", "48.102.213.179"), ("DNS-AI", "194.87.196.13"),
 ]
@@ -36,7 +37,7 @@ SITES = [("ChatGPT", "chatgpt.com", "OpenAI"), ("Claude", "claude.ai", "Anthropi
          ("OpenRouter", "openrouter.ai", "OpenRouter"), ("Notion", "www.notion.so", "Notion"), ("Spotify", "open.spotify.com", "Spotify")]
 BLOCK = ("restrict", "unsupported", "unavailable", "not-available")
 TRIES = 4   # сколько адресов из ответа сервиса пробуем, прежде чем писать «нет связи»
-CONTROL = ("77.88.8.8", "8.8.8.8", "9.9.9.9")   # обычные DNS: Яндекс и Google отвечают как для России, Quad9 — как для заграницы
+CONTROL = ("77.88.8.8", "9.9.9.9", "94.140.14.14")   # Яндекс, Quad9 и AdGuard
 
 
 def query(name):

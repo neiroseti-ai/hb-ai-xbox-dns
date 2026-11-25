@@ -9,8 +9,8 @@ final class LogicTests: XCTestCase {
     // ---------- адреса ----------
 
     func testServiceAddresses() {
-        XCTAssertEqual(Services.setOf("217.144.190.216"), 1)
-        XCTAssertEqual(Services.setOf("109.120.187.249"), 1)
+        XCTAssertNil(Services.setOf("217.144.190.216"))
+        XCTAssertNil(Services.setOf("109.120.187.249"))
         XCTAssertNil(Services.setOf("109.120.177.170"), "адреса MagicDNS из 1.23–1.24 за сервис не выдаются: сервис с них переехал")
         XCTAssertNil(Services.setOf("45.88.163.92"))
         XCTAssertEqual(Services.setOf("153.80.200.170").map { Services.name[$0] }, "Перевал")
@@ -18,7 +18,7 @@ final class LogicTests: XCTestCase {
             XCTAssertNil(Services.setOf(ip), "Geodema и WebShift в программу не взяты: приложение к платному VPN")
             XCTAssertFalse(Services.isStale(ip))
         }
-        XCTAssertEqual(Services.name, ["GeoHide EU", "MagicDNS", "Перевал", "Xbox DNS"])
+        XCTAssertEqual(Services.name, ["GeoHide", "Перевал", "Xbox DNS"])
         for (k, ips) in Services.v4.enumerated() {
             XCTAssertFalse(ips.isEmpty, "у сервиса \(Services.name[k]) есть адрес")
             for ip in ips {
@@ -27,9 +27,9 @@ final class LogicTests: XCTestCase {
             }
         }
         XCTAssertEqual(Set(Services.v4.flatMap { $0 }).count, Services.v4.flatMap { $0 }.count, "ни один адрес не принадлежит двум сервисам")
-        XCTAssertEqual(Services.setOf("143.20.64.192"), 0)
-        XCTAssertEqual(Services.setOf("5.175.161.40"), 0)
-        XCTAssertEqual(Services.name[0], "GeoHide EU", "первым стоит сервис для нейросетей")
+        XCTAssertNil(Services.setOf("143.20.64.192"))
+        XCTAssertNil(Services.setOf("5.175.161.40"))
+        XCTAssertEqual(Services.name[0], "GeoHide", "первым стоит сервис для нейросетей")
         XCTAssertNil(Services.setOf("109.120.132.43"), "старый MagicDNS не выдаётся за сервис")
         XCTAssertNil(Services.setOf("94.250.253.55"), "Comss не выдаётся за сервис: нейросети он больше не открывает")
         XCTAssertNil(Services.setOf("212.109.195.93"))
@@ -37,23 +37,23 @@ final class LogicTests: XCTestCase {
         XCTAssertEqual(Services.setOf("111.88.96.50"), Services.xboxSet, "старый Xbox DNS узнаётся")
         XCTAssertNil(Services.setOf("192.168.1.1"))
         XCTAssertNil(Services.setOf("135.106.217.200"), "Astracat не выдаётся за сервис")
-        XCTAssertNil(Services.setOf("193.233.112.67"), "российский GeoHide не выдаётся за сервис")
+        XCTAssertEqual(Services.v4[0], ["193.233.112.88", "37.230.192.51"])
     }
 
     func testStaleAddresses() {
         XCTAssertTrue(Services.isStale("135.106.217.200"))
-        XCTAssertTrue(Services.isStale("193.233.112.67"))
+        XCTAssertFalse(Services.isStale("193.233.112.67"))
         XCTAssertTrue(Services.isStale("109.120.132.43"))
         XCTAssertTrue(Services.isStale("94.249.177.102"))
         XCTAssertTrue(Services.isStale("45.13.237.213"))
         XCTAssertTrue(Services.isStale("94.250.253.55"), "адреса Comss помечены как старые")
         XCTAssertTrue(Services.isStale("212.109.195.93"))
         XCTAssertTrue(Services.isStale("83.220.169.155"))
-        XCTAssertFalse(Services.isStale("143.20.64.192"))
-        XCTAssertFalse(Services.isStale("5.175.161.40"))
+        XCTAssertTrue(Services.isStale("143.20.64.192"))
+        XCTAssertTrue(Services.isStale("5.175.161.40"))
         XCTAssertTrue(Services.isStale("109.120.177.170"), "адреса MagicDNS из 1.23–1.24 помечены как старые")
         XCTAssertTrue(Services.isStale("45.88.163.92"))
-        XCTAssertFalse(Services.isStale("217.144.190.216"))
+        XCTAssertTrue(Services.isStale("217.144.190.216"))
         XCTAssertFalse(Services.isStale("192.168.1.1"))
     }
 
@@ -182,36 +182,36 @@ final class LogicTests: XCTestCase {
         return ips
     }
 
-    /// Как в программе: три сервиса для нейросетей и Xbox, который не проверяется (nil).
-    private func four(_ a: Int, _ b: Int, _ c: Int) -> [[String]?] { [res(a), res(b), res(c), nil] }
+    /// Как в программе: два сервиса для нейросетей и Xbox, который не проверяется (nil).
+    private func choices(_ a: Int, _ b: Int) -> [[String]?] { [res(a), res(b), nil] }
 
     func testBest() {
-        XCTAssertNil(four(0, 0, 0)[Services.xboxSet], "в этом наборе Xbox — непроверенный")
-        XCTAssertEqual(Probe.best(four(4, 6, 3), current: -1), 1, "больше сайтов")
-        XCTAssertEqual(Probe.best(four(5, 3, 5), current: -1), 0, "при равенстве — раньше в списке")
-        XCTAssertEqual(Probe.best(four(5, 3, 5), current: 2), 2, "при равенстве остаётся текущий")
-        XCTAssertEqual(Probe.best(four(0, 0, 0), current: 1), 1, "ничего не открывается — остаётся текущий")
-        XCTAssertEqual(Probe.best(four(2, 4, 3), current: Services.xboxSet), 1, "текущий Xbox не мешает")
-        XCTAssertEqual(Probe.best(four(0, 0, 0), current: Services.xboxSet), 0, "текущий Xbox и ничего не открывается — первый проверенный, не Xbox")
+        XCTAssertNil(choices(0, 0)[Services.xboxSet], "в этом наборе Xbox — непроверенный")
+        XCTAssertEqual(Probe.best(choices(4, 6), current: -1), 1, "больше сайтов")
+        XCTAssertEqual(Probe.best(choices(5, 5), current: -1), 0, "при равенстве — раньше в списке")
+        XCTAssertEqual(Probe.best(choices(5, 5), current: 1), 1, "при равенстве остаётся текущий")
+        XCTAssertEqual(Probe.best(choices(0, 0), current: 1), 1, "ничего не открывается — остаётся текущий")
+        XCTAssertEqual(Probe.best(choices(2, 4), current: Services.xboxSet), 1, "текущий Xbox не мешает")
+        XCTAssertEqual(Probe.best(choices(0, 0), current: Services.xboxSet), 0, "текущий Xbox и ничего не открывается — первый проверенный, не Xbox")
         XCTAssertEqual(Probe.best([nil, res(0), res(0)], current: -1), 1, "непроверенный первым не выбирается")
     }
 
     func testBestKeepsCurrentForOneSite() {
-        XCTAssertEqual(Probe.best(four(11, 12, 10), current: 0, margin: 2), 0, "DNS включён, лучший обогнал на один сайт — остаёмся")
-        XCTAssertEqual(Probe.best(four(11, 13, 10), current: 0, margin: 2), 1, "обогнал на два — переключаемся")
-        XCTAssertEqual(Probe.best(four(11, 12, 10), current: 0, margin: 1), 1, "DNS выключен — переключаемся и из-за одного сайта")
-        XCTAssertEqual(Probe.best(four(0, 0, 1), current: 0, margin: 2), 2, "текущий не открывает ничего — уходим")
-        XCTAssertEqual(Probe.best(four(11, 12, 12), current: 2, margin: 2), 2, "текущий сам лучший — остаётся")
-        XCTAssertEqual(Probe.best(four(9, 11, 13), current: 0, margin: 2), 2, "среди обогнавших выбирается самый лучший")
-        XCTAssertEqual(Probe.best(four(13, 11, 12), current: 2, margin: 2), 2, "текущий отстал на один сайт от первого в списке — остаётся")
+        XCTAssertEqual(Probe.best(choices(11, 12), current: 0, margin: 2), 0, "DNS включён, лучший обогнал на один сайт — остаёмся")
+        XCTAssertEqual(Probe.best(choices(11, 13), current: 0, margin: 2), 1, "обогнал на два — переключаемся")
+        XCTAssertEqual(Probe.best(choices(11, 12), current: 0, margin: 1), 1, "DNS выключен — переключаемся и из-за одного сайта")
+        XCTAssertEqual(Probe.best(choices(0, 1), current: 0, margin: 2), 1, "текущий не открывает ничего — уходим")
+        XCTAssertEqual(Probe.best(choices(11, 12), current: 1, margin: 2), 1, "текущий сам лучший — остаётся")
+        XCTAssertEqual(Probe.best(choices(9, 13), current: 0, margin: 2), 1, "среди обогнавших выбирается самый лучший")
+        XCTAssertEqual(Probe.best(choices(13, 12), current: 1, margin: 2), 1, "текущий отстал на один сайт от первого в списке — остаётся")
     }
 
     func testBestNote() {
         let n = Probe.host.count
-        XCTAssertEqual(Probe.bestNote(four(11, 12, 10), best: 1, top: 1), "Лучший сейчас: MagicDNS (12 из \(n))")
-        XCTAssertEqual(Probe.bestNote(four(11, 12, 10), best: 0, top: 1), "Оставили GeoHide EU (11 из \(n)): у MagicDNS всего на сайт больше")
-        XCTAssertEqual(Probe.bestNote(four(11, 12, 12), best: 2, top: 1), "Лучший сейчас: Перевал (12 из \(n))", "при равенстве текущий и назван лучшим")
-        XCTAssertEqual(Probe.bestNote(four(0, 0, 0), best: 0, top: 0), "Сейчас ни один сервис не открывает нейросети")
+        XCTAssertEqual(Probe.bestNote(choices(11, 12), best: 1, top: 1), "Лучший сейчас: Перевал (12 из \(n))")
+        XCTAssertEqual(Probe.bestNote(choices(11, 12), best: 0, top: 1), "Оставили GeoHide (11 из \(n)): у Перевал всего на сайт больше")
+        XCTAssertEqual(Probe.bestNote(choices(12, 12), best: 1, top: 0), "Лучший сейчас: Перевал (12 из \(n))", "при равенстве текущий и назван лучшим")
+        XCTAssertEqual(Probe.bestNote(choices(0, 0), best: 0, top: 0), "Сейчас ни один сервис не открывает нейросети")
     }
 
     // ---------- вторая сверка: прокси сервиса — адрес, отданный на сайты разных владельцев ----------

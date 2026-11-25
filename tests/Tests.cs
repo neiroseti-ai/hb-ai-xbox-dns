@@ -558,13 +558,13 @@ namespace HbAi.XboxDns
             var results = new[] { Res(11), Res(12), Res(10), Res(0), null };
 
             T("Подпись: лучший сервис и сколько сайтов открылось из скольких", () =>
-                Eq("Лучший сейчас: MagicDNS (12 из " + Probe.Host.Length + ")", Probe.BestNote(results, 1, 1)));
+                Eq("Лучший сейчас: Перевал (12 из " + Probe.Host.Length + ")", Probe.BestNote(results, 1, 1)));
 
             T("Подпись: остались на текущем из-за разницы в один сайт — так и написано", () =>
-                Eq("Оставили GeoHide EU (11 из " + Probe.Host.Length + "): у MagicDNS всего на сайт больше", Probe.BestNote(results, 0, 1)));
+                Eq("Оставили GeoHide (11 из " + Probe.Host.Length + "): у Перевал всего на сайт больше", Probe.BestNote(results, 0, 1)));
 
             T("Подпись: при равенстве остались на текущем — он и назван лучшим", () =>
-                Eq("Лучший сейчас: Перевал (12 из " + Probe.Host.Length + ")", Probe.BestNote(new[] { Res(11), Res(12), Res(12), null }, 2, 1)));
+                Eq("Лучший сейчас: GeoHide (12 из " + Probe.Host.Length + ")", Probe.BestNote(new[] { Res(12), Res(12), null }, 0, 1)));
 
             T("Подпись: не открывает ни один", () =>
                 Eq("Сейчас ни один сервис не открывает нейросети", Probe.BestNote(new[] { Res(0), Res(0), Res(0), Res(0), null }, 0, 0)));
@@ -596,8 +596,17 @@ namespace HbAi.XboxDns
 
         static void KnownAddresses()
         {
-            T("Адрес MagicDNS узнаётся", () => Eq(1, Dns.SetOf("217.144.190.216")));
-            T("Второй адрес MagicDNS узнаётся", () => Eq(1, Dns.SetOf("109.120.187.249")));
+            T("Адреса MagicDNS из 1.25 за сервис не выдаются: в 1.26 он убран", () =>
+                Eq(true, Dns.SetOf("217.144.190.216") == -1 && Dns.SetOf("109.120.187.249") == -1));
+            T("Адреса MagicDNS из 1.25 помечены как старые — программа предложит поставить рабочие", () =>
+                Eq(true, Dns.IsStale("217.144.190.216") && Dns.IsStale("109.120.187.249")));
+            T("Новый адрес GeoHide 193.233.112.88 узнаётся", () => Eq(0, Dns.SetOf("193.233.112.88")));
+            T("Новый адрес GeoHide 37.230.192.51 узнаётся", () => Eq(0, Dns.SetOf("37.230.192.51")));
+            T("Первым у GeoHide стоит 193.233.112.88", () => Eq("193.233.112.88", Dns.V4[0][0]));
+            T("Адреса европейского узла GeoHide из 1.22–1.25 за сервис не выдаются и помечены как старые", () =>
+                Eq(true, new[] { "5.175.161.40", "143.20.64.192", "45.13.237.213" }.All(a => Dns.SetOf(a) == -1 && Dns.IsStale(a))));
+            T("Прокси GeoHide 193.233.112.67 и 159.194.200.33 больше не считаются старыми адресами", () =>
+                Eq(false, Dns.IsStale("193.233.112.67") || Dns.IsStale("159.194.200.33")));
             T("Адреса MagicDNS из 1.23–1.24 за сервис не выдаются: сервис с них переехал", () =>
                 Eq(true, Dns.SetOf("109.120.177.170") == -1 && Dns.SetOf("45.88.163.92") == -1));
             T("Адреса MagicDNS из 1.23–1.24 помечены как старые — программа предложит поставить рабочие", () =>
@@ -605,16 +614,14 @@ namespace HbAi.XboxDns
             T("Адрес «Перевала» узнаётся", () => Eq("Перевал", Dns.Name[Dns.SetOf("153.80.200.170")]));
             T("Geodema и WebShift в программу не взяты (приложение к платному VPN): их адреса — не сервис и не «старые»", () =>
                 Eq(true, new[] { "179.236.130.10", "179.236.130.11", "31.31.207.68" }.All(a => Dns.SetOf(a) == -1 && !Dns.IsStale(a))));
-            T("Сервисов для нейросетей три, последним стоит Xbox DNS", () =>
-                Eq("GeoHide EU,MagicDNS,Перевал,Xbox DNS", string.Join(",", Dns.Name)));
+            T("Сервисов для нейросетей два, последним стоит Xbox DNS", () =>
+                Eq("GeoHide,Перевал,Xbox DNS", string.Join(",", Dns.Name)));
             T("Ни один адрес не принадлежит двум сервисам сразу", () =>
                 Eq(Dns.V4.Sum(a => a.Length), Dns.V4.SelectMany(a => a).Distinct().Count()));
             T("Адрес каждого сервиса узнаётся как его собственный", () =>
                 Eq(true, Enumerable.Range(0, Dns.Count).All(k => Dns.V4[k].Length > 0 && Dns.V4[k].All(a => Dns.SetOf(a) == k))));
             T("Рабочие адреса сервисов не помечены как старые", () =>
                 Eq(false, Dns.V4.SelectMany(a => a).Any(Dns.IsStale)));
-            T("Адрес GeoHide 143.20.64.192 узнаётся", () => Eq(0, Dns.SetOf("143.20.64.192")));
-            T("Адрес GeoHide 5.175.161.40 узнаётся", () => Eq(0, Dns.SetOf("5.175.161.40")));
             T("Старый адрес MagicDNS (до 04.11) не выдаётся за сервис", () => Eq(-1, Dns.SetOf("109.120.132.43")));
             T("Старые адреса MagicDNS помечены как старые", () => Eq(true, Dns.IsStale("109.120.132.43") && Dns.IsStale("94.249.177.102")));
             T("Адрес GeoHide из 1.22 (45.13.237.213) помечен как старый", () => Eq(true, Dns.IsStale("45.13.237.213")));
@@ -623,22 +630,22 @@ namespace HbAi.XboxDns
             T("Прежний адрес Comss (до 1.22) за сервис не выдаётся", () => Eq(-1, Dns.SetOf("83.220.169.155")));
             T("Адреса Comss помечены как старые — программа предложит поставить рабочие", () =>
                 Eq(true, Dns.IsStale("94.250.253.55") && Dns.IsStale("212.109.195.93") && Dns.IsStale("83.220.169.155")));
-            T("Рабочие адреса GeoHide не старые", () => Eq(false, Dns.IsStale("143.20.64.192") || Dns.IsStale("5.175.161.40")));
+            T("Рабочие адреса GeoHide не старые", () => Eq(false, Dns.IsStale("193.233.112.88") || Dns.IsStale("37.230.192.51")));
             T("У каждого сервиса есть адреса, подпись, сайт и ссылка", () =>
                 Eq(true, new[] { Dns.Short.Length, Dns.V4.Length, Dns.V6.Length, Dns.Opens.Length, Dns.Site.Length, Dns.Url.Length }.All(n => n == Dns.Count)));
             T("Xbox DNS стоит на своём номере", () => Eq("Xbox DNS", Dns.Name[Dns.XboxSet]));
-            T("Первым в списке, который включает кнопка, стоит сервис для нейросетей", () => Eq("GeoHide EU", Dns.Name[0]));
+            T("Первым в списке, который включает кнопка, стоит сервис для нейросетей", () => Eq("GeoHide", Dns.Name[0]));
             T("IPv6 Xbox с зоной и заглавными буквами узнаётся", () => Eq(Dns.XboxSet, Dns.SetOf("2A00:AB00:1233:26::51%12")));
             T("Адрес Xbox DNS из версии 1.0 узнаётся", () => Eq(Dns.XboxSet, Dns.SetOf("111.88.96.50")));
-            T("Нерабочий адрес GeoHide из версии 1.1 не выдаётся за сервис", () => Eq(-1, Dns.SetOf("193.233.112.67")));
-            T("Нерабочий адрес GeoHide из версии 1.1 помечен как старый", () => Eq(true, Dns.IsStale("193.233.112.67")));
+            T("Прокси GeoHide 193.233.112.67 — не адрес DNS программы", () => Eq(-1, Dns.SetOf("193.233.112.67")));
             T("Адрес Astracat из версий 1.2–1.21 помечен как старый", () => Eq(true, Dns.IsStale("135.106.217.200")));
-            T("Рабочий адрес MagicDNS не старый", () => Eq(false, Dns.IsStale("217.144.190.216")));
             T("Свой IPv6 есть только у Xbox DNS: у остальных программа выключает IPv6 на время работы", () =>
                 Eq(true, Enumerable.Range(0, Dns.Count).All(k => (Dns.V6[k].Length > 0) == (k == Dns.XboxSet))));
             T("DNS роутера не старый", () => Eq(false, Dns.IsStale("192.168.1.1")));
             T("DNS роутера — не сервис", () => Eq(-1, Dns.SetOf("192.168.1.1")));
             T("Google 8.8.8.8 — не сервис", () => Eq(-1, Dns.SetOf("8.8.8.8")));
+            T("В сверке нет Google 8.8.8.8: 24.11.2026 из Москвы он не отвечал", () => Eq(false, Probe.Control.Contains("8.8.8.8")));
+            T("В сверке Яндекс, Quad9 и AdGuard", () => Eq("77.88.8.8,9.9.9.9,94.140.14.14", string.Join(",", Probe.Control)));
         }
 
         // ---------- ответ сайта ----------
@@ -981,7 +988,7 @@ namespace HbAi.XboxDns
         static void AfterSwitch()
         {
             T("Включили нужный сервис — ошибки нет", () => Eq(null, MainForm.Outcome(true, MainForm.Reached(true, 1, 1), null, true)));
-            T("Хотели MagicDNS, а встал GeoHide — это сбой", () => Eq(false, MainForm.Reached(true, 1, 0)));
+            T("Хотели Перевал, а встал GeoHide — это сбой", () => Eq(false, MainForm.Reached(true, 1, 0)));
             T("Выключили — сервиса нет, ошибки нет", () => Eq(null, MainForm.Outcome(false, MainForm.Reached(false, 1, -1), null, true)));
             T("Включили, но IPv6 не выключился — «DNS включён, но: …»", () =>
                 Eq("DNS включён, но: IPv6 не выключился на «Wi-Fi»: нет доступа", MainForm.Outcome(true, true, "IPv6 не выключился на «Wi-Fi»: нет доступа", true)));
@@ -1043,8 +1050,8 @@ namespace HbAi.XboxDns
             return (string)typeof(Dns).GetMethod("Restore6", BindingFlags.NonPublic | BindingFlags.Static)
                 .Invoke(null, new object[] { net, f, new Dns.Errors() });
         }
-        const int Magic = 1;
-        const string MagicDns = "dns6 10 reset; dns 10 217.144.190.216,109.120.187.249";
+        const int Magic = 1;   // «Перевал»: сервис без своего IPv6
+        const string MagicDns = "dns6 10 reset; dns 10 153.80.200.170";
 
         static void Switching()
         {
@@ -1077,7 +1084,7 @@ namespace HbAi.XboxDns
                 var net = new FakeNet("Wi-Fi"); string f = ListFile();
                 Dns.Enable(Magic, net, f); net.Take();
                 Dns.Enable(0, net, f);
-                Eq("dns 10 5.175.161.40,143.20.64.192", net.Take());
+                Eq("dns 10 193.233.112.88,37.230.192.51", net.Take());
                 Dns.Disable(net, f);
                 Eq("dns 10 reset; v6on Wi-Fi", net.Take());
                 Dns.Disable(net, f);
@@ -1106,7 +1113,7 @@ namespace HbAi.XboxDns
                 var net = new FakeNet("Wi-Fi", "Ethernet"); string f = ListFile();
                 net.V6On["{Ethernet}"] = false;
                 Dns.Enable(Magic, net, f);
-                Eq("dns6 10 reset; dns 10 217.144.190.216,109.120.187.249; v6off Wi-Fi; dns 11 217.144.190.216,109.120.187.249", net.Take());
+                Eq("dns6 10 reset; dns 10 153.80.200.170; v6off Wi-Fi; dns 11 153.80.200.170", net.Take());
                 Dns.Disable(net, f);
                 Eq("dns 10 reset; dns 11 reset; v6on Wi-Fi", net.Take());
             });
@@ -1139,7 +1146,7 @@ namespace HbAi.XboxDns
                 var net = new FakeNet("Wi-Fi", "Ethernet"); string f = ListFile();
                 net.Refuse.Add("Wi-Fi");
                 Eq("IPv6 не выключился на «Wi-Fi»: нет доступа", Dns.Enable(Magic, net, f));
-                Eq("dns6 10 reset; dns 10 217.144.190.216,109.120.187.249; dns6 11 reset; dns 11 217.144.190.216,109.120.187.249; v6off Ethernet", net.Take());
+                Eq("dns6 10 reset; dns 10 153.80.200.170; dns6 11 reset; dns 11 153.80.200.170; v6off Ethernet", net.Take());
             });
 
             T("Имя подключения с квадратными скобками и кириллицей", () =>

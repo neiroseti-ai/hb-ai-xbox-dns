@@ -1,4 +1,4 @@
-// HB AI · Smart DNS 1.25 для macOS — те же сервисы, такая же проверка (текст страницы не читается, см. Probe.classify)
+// HB AI · Smart DNS 1.26 для macOS — те же сервисы, такая же проверка (текст страницы не читается, см. Probe.classify)
 // и то же уведомление о новой версии, что в версии для Windows.
 import SwiftUI
 import CoreText
